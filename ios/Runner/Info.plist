@@ -49,6 +49,11 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Bluetooth (requerido para posicionamiento BLE en Fase 2+) -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>UTP-Guide usa Bluetooth para calcular tu posición dentro del edificio y guiarte a tu destino.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>UTP-Guide usa Bluetooth para calcular tu posición dentro del edificio y guiarte a tu destino.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

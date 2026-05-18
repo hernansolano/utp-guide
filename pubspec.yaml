@@ -15,6 +15,7 @@ dependencies:
   go_router: ^13.0.0
   sensors_plus: ^4.0.2
   google_fonts: ^6.2.1
+  flutter_blue_plus: ^1.31.0
 
 dev_dependencies:
   flutter_test:

@@ -7,7 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import '../../models/nodo.dart';
 import '../../models/perfil_movilidad.dart';
+import '../../models/position.dart';
 import '../../models/tipo_nodo.dart';
+import '../../services/positioning_service.dart';
 import '../../services/routing_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
@@ -18,12 +20,14 @@ class MapaScreen extends StatefulWidget {
   final String destinoId;
   final PerfilMovilidad perfil;
   final RoutingService routingService;
+  final PositioningService positioningService;
 
   const MapaScreen({
     super.key,
     required this.destinoId,
     required this.perfil,
     required this.routingService,
+    required this.positioningService,
   });
 
   @override
@@ -35,29 +39,35 @@ class _MapaScreenState extends State<MapaScreen> {
   String? _error;
   bool _cargando = true;
   bool _enModoAR = false;
-  StreamSubscription<AccelerometerEvent>? _acelerometroSub;
+
+  // Posición BLE del usuario (null = sin señal)
+  Position? _posicionUsuario;
+  int _beaconsActivos = 0;
 
   // Tamaño del mapa en metros — debe coincidir con grafo.json
   static const _mapaSize = Size(5.0, 5.0);
+
+  StreamSubscription<AccelerometerEvent>? _acelerometroSub;
+  StreamSubscription<Position?>? _posicionSub;
 
   @override
   void initState() {
     super.initState();
     _calcularRuta();
-    _acelerometroSub = accelerometerEventStream(
-      samplingPeriod: const Duration(milliseconds: 200),
-    ).listen(_actualizarModo);
+    _iniciarAcelerometro();
+    _iniciarPosicionamiento();
   }
+
+  // ─── Ruta ──────────────────────────────────────────────────────────────────
 
   Future<void> _calcularRuta() async {
     try {
       final entradas =
           await widget.routingService.nodosPorTipo(TipoNodo.entrada);
       if (entradas.isEmpty) throw Exception('Sin nodo de entrada');
-      final origenId = entradas.first.id;
 
       final ruta = await widget.routingService.calcularRuta(
-        origenId: origenId,
+        origenId: entradas.first.id,
         destinoId: widget.destinoId,
         perfil: widget.perfil,
       );
@@ -67,16 +77,6 @@ class _MapaScreenState extends State<MapaScreen> {
         setState(() { _error = _mensajeError(e); _cargando = false; });
       }
     }
-  }
-
-  void _actualizarModo(AccelerometerEvent event) {
-    final angulo =
-        atan2(event.z, sqrt(event.x * event.x + event.y * event.y));
-    final grados = angulo * 180 / pi;
-    setState(() {
-      if (!_enModoAR && grados > 35) _enModoAR = true;
-      if (_enModoAR && grados < 25) _enModoAR = false;
-    });
   }
 
   String _mensajeError(Object e) {
@@ -90,11 +90,71 @@ class _MapaScreenState extends State<MapaScreen> {
     return 'No se pudo calcular la ruta.\nIntenta de nuevo.';
   }
 
+  // ─── Acelerómetro (cambio mapa ↔ AR) ──────────────────────────────────────
+
+  void _iniciarAcelerometro() {
+    _acelerometroSub = accelerometerEventStream(
+      samplingPeriod: const Duration(milliseconds: 200),
+    ).listen((event) {
+      final angulo =
+          atan2(event.z, sqrt(event.x * event.x + event.y * event.y));
+      final grados = angulo * 180 / pi;
+      // Histéresis deliberada: >35° activa AR, <25° desactiva
+      if (!_enModoAR && grados > 35) setState(() => _enModoAR = true);
+      if (_enModoAR && grados < 25) setState(() => _enModoAR = false);
+    });
+  }
+
+  // ─── Posicionamiento BLE ───────────────────────────────────────────────────
+
+  void _iniciarPosicionamiento() {
+    widget.positioningService.iniciar();
+    _posicionSub = widget.positioningService.posicionStream.listen((pos) {
+      if (mounted) {
+        setState(() {
+          _posicionUsuario = pos;
+          _beaconsActivos = widget.positioningService.beaconsActivos;
+        });
+      }
+    });
+  }
+
+  // ─── Distancia real de la ruta ─────────────────────────────────────────────
+
+  /// Suma de distancias euclidianas entre nodos consecutivos de la ruta.
+  double _distanciaRuta() {
+    double total = 0;
+    for (int i = 0; i < _ruta.length - 1; i++) {
+      final dx = _ruta[i + 1].x - _ruta[i].x;
+      final dy = _ruta[i + 1].y - _ruta[i].y;
+      total += sqrt(dx * dx + dy * dy);
+    }
+    return total;
+  }
+
+  String _formatearDistancia(double metros) {
+    if (metros < 1) return '< 1 m';
+    return '${metros.toStringAsFixed(0)} m';
+  }
+
+  String _formatearTiempo(double metros) {
+    // Velocidad media peatonal: 1.2 m/s
+    final segundos = (metros / 1.2).round();
+    if (segundos < 60) return '${segundos}s';
+    return '${(segundos / 60).ceil()} min';
+  }
+
+  // ─── Lifecycle ─────────────────────────────────────────────────────────────
+
   @override
   void dispose() {
     _acelerometroSub?.cancel();
+    _posicionSub?.cancel();
+    widget.positioningService.detener();
     super.dispose();
   }
+
+  // ─── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -126,10 +186,7 @@ class _MapaScreenState extends State<MapaScreen> {
                   _error!,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    color: colors.fg,
-                    height: 1.5,
-                  ),
+                    fontSize: 16, color: colors.fg, height: 1.5),
                 ),
               ],
             ),
@@ -137,6 +194,8 @@ class _MapaScreenState extends State<MapaScreen> {
         ),
       );
     }
+
+    final dist = _distanciaRuta();
 
     return Scaffold(
       backgroundColor: colors.bgMuted,
@@ -151,39 +210,53 @@ class _MapaScreenState extends State<MapaScreen> {
                   'assets/maps/test_room_5x5.svg',
                   fit: BoxFit.contain,
                 ),
-                // Capa 2: ruta painted
+
+                // Capa 2: ruta + punto de usuario
                 LayoutBuilder(
                   builder: (ctx, constraints) => CustomPaint(
                     painter: MapaPainter.fromContext(
                       ctx,
                       ruta: _ruta,
                       mapaSize: _mapaSize,
+                      posicionUsuario: _posicionUsuario,
                     ),
                     size: Size(constraints.maxWidth, constraints.maxHeight),
                   ),
                 ),
+
                 // Capa 3: pill de destino (top)
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 12,
                   left: 20,
                   right: 20,
-                  child: _buildDestinationPill(context, colors, nombreDestino),
+                  child: _buildDestinationPill(
+                      context, colors, nombreDestino, dist),
                 ),
+
                 // Controles laterales
                 Positioned(
                   right: 20,
                   top: MediaQuery.of(context).padding.top + 80,
                   child: Column(
                     children: [
-                      _sideButton(
-                          context, colors, Icons.my_location_rounded, () {}),
+                      _sideButton(context, colors,
+                          Icons.my_location_rounded, () {}),
                       const SizedBox(height: 10),
-                      _sideButton(
-                          context, colors, Icons.format_list_bulleted_rounded, () {}),
+                      _sideButton(context, colors,
+                          Icons.format_list_bulleted_rounded, () {}),
                     ],
                   ),
                 ),
-                // FAB AR
+
+                // Indicador BLE (esquina inferior izquierda, solo si no AR)
+                if (!_enModoAR)
+                  Positioned(
+                    left: 16,
+                    bottom: 16,
+                    child: _buildBleChip(colors),
+                  ),
+
+                // FAB AR/Mapa (esquina inferior derecha)
                 Positioned(
                   right: 20,
                   bottom: 20,
@@ -213,7 +286,8 @@ class _MapaScreenState extends State<MapaScreen> {
                     ),
                   ),
                 ),
-                // Minimapa en modo AR
+
+                // Minimapa (solo modo AR, esquina inferior izquierda)
                 if (_enModoAR)
                   Positioned(
                     left: 16,
@@ -226,8 +300,10 @@ class _MapaScreenState extends State<MapaScreen> {
               ],
             ),
           ),
-          // Navigation card con el paso actual y botón Salir
+
+          // Tarjeta de navegación
           _buildNavigationCard(context, colors, nombreDestino),
+
           BottomNavWidget(
             activeTab: 'map',
             onTabChanged: (tab) {
@@ -241,8 +317,10 @@ class _MapaScreenState extends State<MapaScreen> {
     );
   }
 
-  Widget _buildDestinationPill(
-      BuildContext context, AppColors colors, String nombre) {
+  // ─── Widgets auxiliares ────────────────────────────────────────────────────
+
+  Widget _buildDestinationPill(BuildContext context, AppColors colors,
+      String nombre, double dist) {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -278,7 +356,7 @@ class _MapaScreenState extends State<MapaScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '1 min · 65 m',
+                  '${_formatearTiempo(dist)} · ${_formatearDistancia(dist)}',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -295,8 +373,7 @@ class _MapaScreenState extends State<MapaScreen> {
     );
   }
 
-  Widget _pillIconButton(
-      IconData icon, VoidCallback onTap, Color color) {
+  Widget _pillIconButton(IconData icon, VoidCallback onTap, Color color) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -311,8 +388,8 @@ class _MapaScreenState extends State<MapaScreen> {
     );
   }
 
-  Widget _sideButton(
-      BuildContext context, AppColors colors, IconData icon, VoidCallback onTap) {
+  Widget _sideButton(BuildContext context, AppColors colors, IconData icon,
+      VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -329,6 +406,52 @@ class _MapaScreenState extends State<MapaScreen> {
           ],
         ),
         child: Icon(icon, color: colors.fg, size: 20),
+      ),
+    );
+  }
+
+  /// Chip de estado BLE: muestra cuántos beacons están activos y
+  /// si se detectó posición. Útil para calibrar durante las pruebas.
+  Widget _buildBleChip(AppColors colors) {
+    final tienePos = _posicionUsuario != null;
+    final bgColor = tienePos ? colors.accessible : colors.bgMuted;
+    final fgColor = tienePos ? Colors.white : colors.fgSoft;
+    final label = tienePos
+        ? 'BLE · $_beaconsActivos beacon${_beaconsActivos != 1 ? 's' : ''}'
+        : 'Sin señal BLE';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 6),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: tienePos ? Colors.white : colors.fgSoft,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: fgColor,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -350,8 +473,8 @@ class _MapaScreenState extends State<MapaScreen> {
               color: colors.brandSoft,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(Icons.turn_left_rounded,
-                color: colors.brand, size: 22),
+            child:
+                Icon(Icons.turn_left_rounded, color: colors.brand, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -359,7 +482,7 @@ class _MapaScreenState extends State<MapaScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Siga el pasillo, gire a la izquierda',
+                  'Dirígete hacia $nombre',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -369,9 +492,12 @@ class _MapaScreenState extends State<MapaScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'En 25 m · hacia $nombre',
+                  _posicionUsuario != null
+                      ? 'Posición: (${_posicionUsuario!.x.toStringAsFixed(1)} m, '
+                          '${_posicionUsuario!.y.toStringAsFixed(1)} m)'
+                      : 'Esperando señal BLE…',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: colors.fgMuted,
                   ),
@@ -393,8 +519,7 @@ class _MapaScreenState extends State<MapaScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.close_rounded,
-                      color: colors.danger, size: 14),
+                  Icon(Icons.close_rounded, color: colors.danger, size: 14),
                   const SizedBox(width: 6),
                   Text(
                     'Salir',
