@@ -1,0 +1,9 @@
+{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "major": 1,
+  "beacons": [
+    {"minor": 1, "x": 0.5, "y": 0.5, "descripcion": "Beacon esquina NO"},
+    {"minor": 2, "x": 4.5, "y": 0.5, "descripcion": "Beacon esquina NE"},
+    {"minor": 3, "x": 2.5, "y": 4.0, "descripcion": "Beacon centro sur"}
+  ]
+}

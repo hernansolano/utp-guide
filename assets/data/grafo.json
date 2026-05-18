@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "piso": 1,
+  "edificio": "TEST",
+  "origen_descripcion": "Esquina superior izquierda, en metros",
+  "mapa_svg": "assets/maps/test_room_5x5.svg",
+  "mapa_ancho_metros": 5.0,
+  "mapa_alto_metros": 5.0,
+  "nodos": [
+    {"id": "entrada",    "nombre": "Entrada",      "tipo": "ENTRADA",       "x": 2.5, "y": 4.5, "piso": 1, "accesible": true},
+    {"id": "centro",     "nombre": "Centro",       "tipo": "INTERSECCION",  "x": 2.5, "y": 2.5, "piso": 1, "accesible": true},
+    {"id": "esq_no",     "nombre": "Esquina NO",   "tipo": "INTERSECCION",  "x": 0.5, "y": 0.5, "piso": 1, "accesible": true},
+    {"id": "esq_ne",     "nombre": "Esquina NE",   "tipo": "INTERSECCION",  "x": 4.5, "y": 0.5, "piso": 1, "accesible": true},
+    {"id": "esq_so",     "nombre": "Esquina SO",   "tipo": "INTERSECCION",  "x": 0.5, "y": 4.5, "piso": 1, "accesible": true},
+    {"id": "esq_se",     "nombre": "Esquina SE",   "tipo": "INTERSECCION",  "x": 4.5, "y": 4.5, "piso": 1, "accesible": true}
+  ],
+  "aristas": [
+    {"origenId": "entrada", "destinoId": "centro",  "distancia": 2.0, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "centro",  "destinoId": "esq_no",  "distancia": 2.83, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "centro",  "destinoId": "esq_ne",  "distancia": 2.83, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "centro",  "destinoId": "esq_so",  "distancia": 2.83, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "centro",  "destinoId": "esq_se",  "distancia": 2.83, "tipoObstaculo": "NINGUNO", "accesible": true}
+  ]
+}

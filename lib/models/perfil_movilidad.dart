@@ -1,0 +1,1 @@
+enum PerfilMovilidad { estandar, accesible }
