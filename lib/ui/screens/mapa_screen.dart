@@ -9,6 +9,7 @@ import '../../models/nodo.dart';
 import '../../models/perfil_movilidad.dart';
 import '../../models/position.dart';
 import '../../models/tipo_nodo.dart';
+import '../../services/ble_service.dart';
 import '../../services/positioning_service.dart';
 import '../../services/routing_service.dart';
 import '../theme/app_theme.dart';
@@ -16,6 +17,21 @@ import '../widgets/bottom_nav.dart';
 import '../widgets/mapa_painter.dart';
 import '../widgets/minimap_widget.dart';
 
+/// Pantalla principal de navegación.
+///
+/// Muestra:
+/// - El mapa SVG del piso
+/// - La ruta calculada por A* desde la entrada al destino
+/// - El punto azul de posición del usuario (BLE en tiempo real)
+/// - Pill superior con destino + distancia/tiempo estimados
+/// - Chip de estado BLE en esquina inferior
+/// - Botón flotante para alternar mapa/AR (Fase 3+)
+///
+/// Reacciona al estado del `BleService`:
+/// - `permisosNegados`  → diálogo pidiendo activar permisos en Ajustes
+/// - `bluetoothApagado` → diálogo pidiendo encender Bluetooth
+/// - `escaneando`       → chip BLE verde
+/// - `inactivo`/`error` → chip BLE gris
 class MapaScreen extends StatefulWidget {
   final String destinoId;
   final PerfilMovilidad perfil;
@@ -40,15 +56,19 @@ class _MapaScreenState extends State<MapaScreen> {
   bool _cargando = true;
   bool _enModoAR = false;
 
-  // Posición BLE del usuario (null = sin señal)
+  // Posición BLE del usuario (null = sin señal).
   Position? _posicionUsuario;
   int _beaconsActivos = 0;
+  BleEstado _bleEstado = BleEstado.inactivo;
+  bool _dialogoMostrado = false; // Para no mostrar el diálogo en loop.
 
-  // Tamaño del mapa en metros — debe coincidir con grafo.json
+  // Tamaño del mapa en metros — coincide con grafo.json del cuarto de prueba.
+  // En Fase 2 se va a leer de GrafoRepository.obtenerDimensionesMapa().
   static const _mapaSize = Size(5.0, 5.0);
 
   StreamSubscription<AccelerometerEvent>? _acelerometroSub;
   StreamSubscription<Position?>? _posicionSub;
+  StreamSubscription<BleEstado>? _estadoBleSub;
 
   @override
   void initState() {
@@ -99,7 +119,7 @@ class _MapaScreenState extends State<MapaScreen> {
       final angulo =
           atan2(event.z, sqrt(event.x * event.x + event.y * event.y));
       final grados = angulo * 180 / pi;
-      // Histéresis deliberada: >35° activa AR, <25° desactiva
+      // Histéresis deliberada: >35° activa AR, <25° desactiva.
       if (!_enModoAR && grados > 35) setState(() => _enModoAR = true);
       if (_enModoAR && grados < 25) setState(() => _enModoAR = false);
     });
@@ -108,7 +128,12 @@ class _MapaScreenState extends State<MapaScreen> {
   // ─── Posicionamiento BLE ───────────────────────────────────────────────────
 
   void _iniciarPosicionamiento() {
-    widget.positioningService.iniciar();
+    // Suscribirse a streams ANTES de llamar iniciar() para no perder eventos.
+    _estadoBleSub =
+        widget.positioningService.estadoBleStream.listen((estado) {
+      if (mounted) setState(() => _bleEstado = estado);
+    });
+
     _posicionSub = widget.positioningService.posicionStream.listen((pos) {
       if (mounted) {
         setState(() {
@@ -117,11 +142,71 @@ class _MapaScreenState extends State<MapaScreen> {
         });
       }
     });
+
+    // iniciar() es async pero no necesitamos esperar — los streams notifican
+    // cuando empiezan a llegar lecturas o cuando cambia el estado del BLE.
+    widget.positioningService.iniciar();
+  }
+
+  /// Muestra un diálogo si el BLE no está disponible y el usuario aún
+  /// no lo ha visto. Idempotente — usa [_dialogoMostrado] como guard.
+  Future<void> _mostrarDialogoBleSiAplica() async {
+    if (_dialogoMostrado) return;
+    if (_bleEstado != BleEstado.permisosNegados &&
+        _bleEstado != BleEstado.bluetoothApagado) {
+      return;
+    }
+
+    _dialogoMostrado = true;
+    final colors = context.colors;
+    final esPermisos = _bleEstado == BleEstado.permisosNegados;
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: colors.surface,
+        title: Text(
+          esPermisos ? 'Activa los permisos' : 'Activa Bluetooth',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: colors.fg,
+          ),
+        ),
+        content: Text(
+          esPermisos
+              ? 'UTP-Guide necesita acceso a Bluetooth para calcular tu '
+                  'posición dentro del edificio. Actívalo en Ajustes del '
+                  'sistema → Apps → UTP Guide → Permisos.'
+              : 'El Bluetooth de tu dispositivo está apagado. Actívalo '
+                  'desde el panel de control rápido para ver tu posición '
+                  'en el mapa.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            color: colors.fgMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Entendido',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                color: colors.brand,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ─── Distancia real de la ruta ─────────────────────────────────────────────
 
   /// Suma de distancias euclidianas entre nodos consecutivos de la ruta.
+  /// En metros (las coordenadas ya están en metros).
   double _distanciaRuta() {
     double total = 0;
     for (int i = 0; i < _ruta.length - 1; i++) {
@@ -138,7 +223,7 @@ class _MapaScreenState extends State<MapaScreen> {
   }
 
   String _formatearTiempo(double metros) {
-    // Velocidad media peatonal: 1.2 m/s
+    // Velocidad media peatonal: 1.2 m/s (5 km/h aproximado).
     final segundos = (metros / 1.2).round();
     if (segundos < 60) return '${segundos}s';
     return '${(segundos / 60).ceil()} min';
@@ -150,6 +235,7 @@ class _MapaScreenState extends State<MapaScreen> {
   void dispose() {
     _acelerometroSub?.cancel();
     _posicionSub?.cancel();
+    _estadoBleSub?.cancel();
     widget.positioningService.detener();
     super.dispose();
   }
@@ -161,6 +247,10 @@ class _MapaScreenState extends State<MapaScreen> {
     final colors = context.colors;
     final nombreDestino =
         _ruta.isNotEmpty ? _ruta.last.nombre : widget.destinoId;
+
+    // Mostrar diálogo si aplica (post-frame para no llamar setState en build).
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _mostrarDialogoBleSiAplica());
 
     if (_cargando) {
       return Scaffold(
@@ -186,7 +276,10 @@ class _MapaScreenState extends State<MapaScreen> {
                   _error!,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16, color: colors.fg, height: 1.5),
+                    fontSize: 16,
+                    color: colors.fg,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),
@@ -205,13 +298,10 @@ class _MapaScreenState extends State<MapaScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Capa 1: mapa SVG
                 SvgPicture.asset(
                   'assets/maps/test_room_5x5.svg',
                   fit: BoxFit.contain,
                 ),
-
-                // Capa 2: ruta + punto de usuario
                 LayoutBuilder(
                   builder: (ctx, constraints) => CustomPaint(
                     painter: MapaPainter.fromContext(
@@ -223,8 +313,6 @@ class _MapaScreenState extends State<MapaScreen> {
                     size: Size(constraints.maxWidth, constraints.maxHeight),
                   ),
                 ),
-
-                // Capa 3: pill de destino (top)
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 12,
                   left: 20,
@@ -232,8 +320,6 @@ class _MapaScreenState extends State<MapaScreen> {
                   child: _buildDestinationPill(
                       context, colors, nombreDestino, dist),
                 ),
-
-                // Controles laterales
                 Positioned(
                   right: 20,
                   top: MediaQuery.of(context).padding.top + 80,
@@ -247,16 +333,12 @@ class _MapaScreenState extends State<MapaScreen> {
                     ],
                   ),
                 ),
-
-                // Indicador BLE (esquina inferior izquierda, solo si no AR)
                 if (!_enModoAR)
                   Positioned(
                     left: 16,
                     bottom: 16,
                     child: _buildBleChip(colors),
                   ),
-
-                // FAB AR/Mapa (esquina inferior derecha)
                 Positioned(
                   right: 20,
                   bottom: 20,
@@ -286,8 +368,6 @@ class _MapaScreenState extends State<MapaScreen> {
                     ),
                   ),
                 ),
-
-                // Minimapa (solo modo AR, esquina inferior izquierda)
                 if (_enModoAR)
                   Positioned(
                     left: 16,
@@ -300,10 +380,7 @@ class _MapaScreenState extends State<MapaScreen> {
               ],
             ),
           ),
-
-          // Tarjeta de navegación
           _buildNavigationCard(context, colors, nombreDestino),
-
           BottomNavWidget(
             activeTab: 'map',
             onTabChanged: (tab) {
@@ -400,9 +477,7 @@ class _MapaScreenState extends State<MapaScreen> {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-            ),
+                color: Colors.black.withValues(alpha: 0.1), blurRadius: 8),
           ],
         ),
         child: Icon(icon, color: colors.fg, size: 20),
@@ -410,14 +485,14 @@ class _MapaScreenState extends State<MapaScreen> {
     );
   }
 
-  /// Chip de estado BLE: muestra cuántos beacons están activos y
-  /// si se detectó posición. Útil para calibrar durante las pruebas.
+  /// Chip de estado BLE: muestra balizas activas y permite identificar
+  /// rápidamente si el sistema está funcionando.
   Widget _buildBleChip(AppColors colors) {
     final tienePos = _posicionUsuario != null;
     final bgColor = tienePos ? colors.accessible : colors.bgMuted;
     final fgColor = tienePos ? Colors.white : colors.fgSoft;
     final label = tienePos
-        ? 'BLE · $_beaconsActivos beacon${_beaconsActivos != 1 ? 's' : ''}'
+        ? 'BLE · $_beaconsActivos baliza${_beaconsActivos != 1 ? 's' : ''}'
         : 'Sin señal BLE';
 
     return Container(
@@ -427,8 +502,7 @@ class _MapaScreenState extends State<MapaScreen> {
         borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 6),
+              color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
         ],
       ),
       child: Row(

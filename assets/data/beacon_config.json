@@ -1,9 +1,18 @@
 {
+  "_descripcion": "Configuración de balizas BLE y parámetros de calibración del posicionamiento. Editar en campo no requiere recompilar la app.",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 1,
+  "calibracion": {
+    "_descripcion": "Parámetros del modelo de path-loss para entornos interiores. Valores actuales calibrados para edificio con muros de concreto (FISC). Ver docs/positioning-ble.md y docs/adr/0002-parametros-path-loss.md.",
+    "txPower_dbm_default": -65,
+    "n_exponente_perdida": 3.5,
+    "ventana_media_movil": 8,
+    "tolerancia_snap_metros": 3.0,
+    "expiracion_lectura_segundos": 3
+  },
   "beacons": [
-    {"minor": 1, "x": 0.5, "y": 0.5, "descripcion": "Beacon esquina NO"},
-    {"minor": 2, "x": 4.5, "y": 0.5, "descripcion": "Beacon esquina NE"},
-    {"minor": 3, "x": 2.5, "y": 4.0, "descripcion": "Beacon centro sur"}
+    {"minor": 1, "x": 0.5, "y": 0.5, "txPower_dbm": -65, "descripcion": "Beacon esquina NO"},
+    {"minor": 2, "x": 4.5, "y": 0.5, "txPower_dbm": -65, "descripcion": "Beacon esquina NE"},
+    {"minor": 3, "x": 2.5, "y": 4.0, "txPower_dbm": -65, "descripcion": "Beacon centro sur"}
   ]
 }

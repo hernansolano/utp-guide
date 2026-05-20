@@ -5,6 +5,32 @@ import '../../models/arista.dart';
 import '../../models/tipo_nodo.dart';
 import '../exceptions.dart';
 
+/// Dimensiones físicas del mapa de un piso, en metros.
+///
+/// Se usan para convertir entre el sistema de coordenadas del grafo
+/// (metros) y el SVG (píxeles), y para clampar la posición estimada
+/// dentro de los límites del piso.
+class DimensionesMapa {
+  final double anchoMetros;
+  final double altoMetros;
+
+  const DimensionesMapa(this.anchoMetros, this.altoMetros);
+}
+
+/// Carga, valida y expone el grafo de navegación de un piso.
+///
+/// La fuente de verdad es `assets/data/grafo.json`. Ver
+/// `docs/grafo-format.md` para el formato completo.
+///
+/// El grafo se modela como **no dirigido**: el repositorio agrega
+/// automáticamente la arista inversa de cada arista del archivo. Por
+/// ejemplo, si el JSON define `A → B con distancia=5`, este repositorio
+/// devuelve dos aristas: `A → B` y `B → A`, ambas con distancia 5.
+///
+/// La validación ([_validar]) se ejecuta al cargar el archivo y rechaza
+/// grafos con IDs duplicados, aristas a nodos inexistentes, distancias
+/// no positivas, o sin nodo `ENTRADA`. Lanza [GrafoInvalidoException]
+/// con un mensaje descriptivo.
 class GrafoRepository {
   Map<String, dynamic>? _cachedData;
 
@@ -60,13 +86,14 @@ class GrafoRepository {
       }
     }
 
-    final tieneEntrada =
-        nodosList.any((n) => n['tipo'] == 'ENTRADA');
+    final tieneEntrada = nodosList.any((n) => n['tipo'] == 'ENTRADA');
     if (!tieneEntrada) {
-      throw GrafoInvalidoException('El grafo debe tener al menos un nodo ENTRADA');
+      throw GrafoInvalidoException(
+          'El grafo debe tener al menos un nodo ENTRADA');
     }
   }
 
+  /// Devuelve todos los nodos del piso.
   Future<List<Nodo>> obtenerNodos() async {
     final data = await _load();
     return (data['nodos'] as List<dynamic>)
@@ -74,6 +101,11 @@ class GrafoRepository {
         .toList();
   }
 
+  /// Devuelve todas las aristas del grafo en ambas direcciones.
+  ///
+  /// El grafo del JSON es no dirigido — este método agrega la arista
+  /// inversa de cada entrada del archivo, lo que es necesario para que
+  /// el algoritmo A* pueda recorrer aristas en cualquier dirección.
   Future<List<Arista>> obtenerAristas() async {
     final data = await _load();
     final directas = (data['aristas'] as List<dynamic>)
@@ -83,6 +115,7 @@ class GrafoRepository {
     return [...directas, ...inversas];
   }
 
+  /// Devuelve un nodo por su `id`. Lanza [NodeNotFoundException] si no existe.
   Future<Nodo> obtenerNodoPorId(String id) async {
     final nodos = await obtenerNodos();
     final nodo = nodos.where((n) => n.id == id).firstOrNull;
@@ -90,8 +123,22 @@ class GrafoRepository {
     return nodo;
   }
 
+  /// Devuelve todos los nodos de un tipo específico (Salones, Baños, etc.).
   Future<List<Nodo>> obtenerNodosPorTipo(TipoNodo tipo) async {
     final nodos = await obtenerNodos();
     return nodos.where((n) => n.tipo == tipo).toList();
+  }
+
+  /// Dimensiones físicas del piso modelado, en metros.
+  ///
+  /// Se leen de `mapa_ancho_metros` y `mapa_alto_metros` en el JSON.
+  /// Si faltan, se usan 5×5 m como default (compatibilidad con el cuarto
+  /// de prueba inicial).
+  Future<DimensionesMapa> obtenerDimensionesMapa() async {
+    final data = await _load();
+    return DimensionesMapa(
+      (data['mapa_ancho_metros'] as num?)?.toDouble() ?? 5.0,
+      (data['mapa_alto_metros'] as num?)?.toDouble() ?? 5.0,
+    );
   }
 }
