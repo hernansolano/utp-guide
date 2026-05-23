@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Plantilla base para SVG de planta de piso.
+
+  REGLAS OBLIGATORIAS (ver docs/map-format.md):
+  1. Escala fija: 100 px = 1 metro
+  2. Origen (0, 0) en la esquina superior izquierda
+  3. Eje Y positivo hacia abajo (convención SVG estándar)
+  4. viewBox: "0 0 (ancho_metros × 100) (alto_metros × 100)"
+  5. Mantener las dimensiones de `mapa_ancho_metros` y `mapa_alto_metros`
+     en grafo.json coincidentes con el viewBox.
+
+  CÓMO USAR ESTA PLANTILLA:
+  1. Copiar a assets/maps/<edificio>_<piso>.svg
+  2. Ajustar el viewBox y los atributos width/height del <svg>
+     a las dimensiones reales del piso × 100
+  3. Dibujar paredes, puertas, etiquetas en sus capas correspondientes
+  4. Eliminar la capa #grid-referencia antes de exportar (es solo guía)
+  5. Exportar como Plain SVG (no Inkscape SVG)
+  6. Validar con: dart tools/grafo_editor.dart validar-mapa
+
+  Las dimensiones de ejemplo abajo son para un piso de 10 × 10 metros.
+  Ajustar al tamaño real del piso a modelar.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1000 1000"
+     width="1000"
+     height="1000"
+     preserveAspectRatio="xMidYMid meet">
+
+  <!-- ─── CAPA 1: Fondo del piso ───────────────────────────────────────── -->
+  <g id="fondo">
+    <rect x="0" y="0" width="1000" height="1000" fill="#F5F5F0"/>
+  </g>
+
+  <!-- ─── CAPA 2: Paredes externas ─────────────────────────────────────── -->
+  <!-- Grosor estándar: 8 px (= 8 cm en el mundo real). -->
+  <g id="paredes-externas">
+    <rect x="20" y="20" width="960" height="960"
+          fill="none" stroke="#2C2C2A" stroke-width="8" rx="4"/>
+  </g>
+
+  <!-- ─── CAPA 3: Paredes internas ─────────────────────────────────────── -->
+  <!-- Grosor estándar: 6 px. Aquí van las divisiones entre cuartos. -->
+  <g id="paredes-internas">
+    <!-- Ejemplo de pared interna eliminada en el template real: -->
+    <!-- <line x1="500" y1="20" x2="500" y2="500" stroke="#2C2C2A" stroke-width="6"/> -->
+  </g>
+
+  <!-- ─── CAPA 4: Puertas ──────────────────────────────────────────────── -->
+  <!--
+    Cada puerta se modela con:
+      - Una línea blanca sobre la pared (apertura)
+      - Un arco punteado que indica el sentido de apertura
+    El arco es opcional pero recomendado (convención arquitectónica).
+  -->
+  <g id="puertas">
+    <!-- Ejemplo de puerta de entrada en la pared sur, centrada: -->
+    <!--
+    <line x1="450" y1="980" x2="550" y2="980" stroke="#F5F5F0" stroke-width="10"/>
+    <path d="M450 980 Q450 900 550 980" fill="none" stroke="#2C2C2A"
+          stroke-width="1.5" stroke-dasharray="4 3"/>
+    <line x1="450" y1="980" x2="550" y2="980" stroke="#888780" stroke-width="2"/>
+    -->
+  </g>
+
+  <!-- ─── CAPA 5: Escaleras / ascensores ───────────────────────────────── -->
+  <g id="escaleras-ascensores">
+    <!-- Ejemplo:
+    <rect x="100" y="100" width="80" height="120" fill="#E5E5DD" stroke="#888780"/>
+    <text x="140" y="170" font-size="14" fill="#444441" text-anchor="middle">Esc</text>
+    -->
+  </g>
+
+  <!-- ─── CAPA 6: Etiquetas de cuartos ─────────────────────────────────── -->
+  <!--
+    Texto con el nombre/número de cada cuarto, centrado en su área.
+    Tamaño estándar: 14 px para salones, 11 px para espacios menores.
+  -->
+  <g id="etiquetas" font-family="sans-serif">
+    <!-- Ejemplo:
+    <text x="300" y="300" font-size="14" fill="#444441" text-anchor="middle"
+          font-weight="500">Salón 301</text>
+    -->
+  </g>
+
+  <!-- ─── CAPA 7: Mobiliario (opcional) ────────────────────────────────── -->
+  <!--
+    Solo agregar mobiliario si aporta orientación al usuario (ej: una
+    escultura icónica en un lobby). Mobiliario decorativo (sillas,
+    escritorios) infla el SVG sin beneficio.
+  -->
+  <g id="mobiliario">
+  </g>
+
+  <!-- ─── CAPA 8: Grid de referencia (ELIMINAR ANTES DE EXPORTAR) ──────── -->
+  <!--
+    Grid cada 100 px = 1 metro, dashed gris.
+    Útil mientras se dibuja para colocar elementos en posiciones precisas.
+    DEBE eliminarse del archivo final que se commitea — los usuarios no
+    necesitan ver el grid.
+  -->
+  <g id="grid-referencia" stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4">
+    <!-- Líneas verticales cada 1m -->
+    <line x1="100"  y1="20" x2="100"  y2="980"/>
+    <line x1="200"  y1="20" x2="200"  y2="980"/>
+    <line x1="300"  y1="20" x2="300"  y2="980"/>
+    <line x1="400"  y1="20" x2="400"  y2="980"/>
+    <line x1="500"  y1="20" x2="500"  y2="980"/>
+    <line x1="600"  y1="20" x2="600"  y2="980"/>
+    <line x1="700"  y1="20" x2="700"  y2="980"/>
+    <line x1="800"  y1="20" x2="800"  y2="980"/>
+    <line x1="900"  y1="20" x2="900"  y2="980"/>
+    <!-- Líneas horizontales cada 1m -->
+    <line x1="20" y1="100" x2="980" y2="100"/>
+    <line x1="20" y1="200" x2="980" y2="200"/>
+    <line x1="20" y1="300" x2="980" y2="300"/>
+    <line x1="20" y1="400" x2="980" y2="400"/>
+    <line x1="20" y1="500" x2="980" y2="500"/>
+    <line x1="20" y1="600" x2="980" y2="600"/>
+    <line x1="20" y1="700" x2="980" y2="700"/>
+    <line x1="20" y1="800" x2="980" y2="800"/>
+    <line x1="20" y1="900" x2="980" y2="900"/>
+  </g>
+
+</svg>

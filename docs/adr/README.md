@@ -27,6 +27,8 @@ Los ADRs son **inmutables**. Si una decisión se revierte o evoluciona, se crea 
 | [0003](0003-snap-to-graph-aristas.md) | Snap-to-graph por aristas en lugar de nodos | aceptado | 2026-05-17 |
 | [0004](0004-permisos-runtime.md) | Uso de `permission_handler` para permisos BLE en runtime | aceptado | 2026-05-19 |
 | [0005](0005-grafo-editor-cli.md) | GrafoEditor como CLI en Dart en lugar de pantalla in-app | aceptado | 2026-05-19 |
+| [0006](0006-formato-mapa-svg-metrico.md) | Formato de mapas: SVG vectorial con escala métrica fija | aceptado | 2026-05-19 |
+| [0007](0007-validacion-cruzada-mapa-grafo.md) | Validación cruzada entre el SVG del mapa y `grafo.json` | aceptado | 2026-05-19 |
 
 ## Cómo crear un nuevo ADR
 

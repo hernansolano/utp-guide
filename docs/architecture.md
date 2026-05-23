@@ -45,6 +45,15 @@ Los servicios y repositorios se instancian una sola vez en `main.dart` como sing
 
 **Regla:** ninguna coordenada de planta, distancia o parámetro de calibración debe vivir en código Dart. Si aparece, es un bug.
 
+### Coherencia entre el SVG del mapa y `grafo.json`
+
+Cada piso se modela con dos archivos que deben permanecer en sincronía:
+
+- `assets/maps/<edificio>_<piso>.svg` — representación visual de paredes, puertas, etiquetas
+- `assets/data/grafo.json` — nodos navegables, aristas, dimensiones del piso en metros
+
+La relación es: `viewBox_ancho_px = mapa_ancho_metros × 100`. La escala es fija (100 px = 1 m) y está documentada en [`map-format.md`](map-format.md) y [`adr/0006-formato-mapa-svg-metrico.md`](adr/0006-formato-mapa-svg-metrico.md). El comando `dart tools/grafo_editor.dart validar-mapa` verifica la coherencia.
+
 ### 3. Streams sobre callbacks
 
 Toda señal asíncrona (lecturas BLE, posición estimada, eventos del acelerómetro) se expone como `Stream<T>`. Los consumidores usan `StreamSubscription` y los cancelan en `dispose()`.

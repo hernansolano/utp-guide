@@ -2,6 +2,8 @@
 
 Este documento describe el procedimiento físico para instalar las balizas Minew E2 Max en un piso y calibrar los parámetros del sistema de posicionamiento.
 
+> **Prerrequisito:** el piso debe estar ya modelado en `assets/maps/<edificio>_<piso>.svg` y `assets/data/grafo.json`. Las coordenadas de las balizas que se registran en `beacon_config.json` están en el mismo sistema (metros desde la esquina superior izquierda) que los nodos del grafo. Ver [`map-format.md`](map-format.md) para el procedimiento de autoría del mapa.
+
 ## 1. Hardware
 
 ### Modelo recomendado

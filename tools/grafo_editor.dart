@@ -64,6 +64,8 @@ Future<int> main(List<String> argv) async {
         return await _removeArista(args);
       case 'validar':
         return await _validar();
+      case 'validar-mapa':
+        return await _validarMapa();
       default:
         stderr.writeln('Comando desconocido: "$comando"');
         _printUsage();
@@ -279,6 +281,124 @@ Future<int> _validar() async {
   return 0;
 }
 
+/// Verifica que el SVG declarado en `mapa_svg` exista y que sus
+/// dimensiones (viewBox) coincidan con las del grafo.
+///
+/// Reglas verificadas (ver docs/adr/0007-validacion-cruzada-mapa-grafo.md):
+/// 1. El archivo SVG existe en disco
+/// 2. El viewBox parsea como cuatro números
+/// 3. min-x y min-y son 0
+/// 4. viewBox_ancho = mapa_ancho_metros × 100 (±1 px de tolerancia)
+/// 5. viewBox_alto  = mapa_alto_metros  × 100 (±1 px de tolerancia)
+/// 6. Cada nodo está dentro de las dimensiones declaradas
+///
+/// No verifica geometría interna del SVG ni correspondencia entre
+/// aristas y pasillos reales — eso requiere verificación visual.
+Future<int> _validarMapa() async {
+  final grafo = await _cargar();
+  _validarGrafo(grafo);
+
+  final svgPath = grafo['mapa_svg'] as String?;
+  final anchoMetros = (grafo['mapa_ancho_metros'] as num?)?.toDouble();
+  final altoMetros = (grafo['mapa_alto_metros'] as num?)?.toDouble();
+
+  if (svgPath == null) throw 'grafo.json no declara "mapa_svg"';
+  if (anchoMetros == null) {
+    throw 'grafo.json no declara "mapa_ancho_metros"';
+  }
+  if (altoMetros == null) {
+    throw 'grafo.json no declara "mapa_alto_metros"';
+  }
+
+  // Regla 1: SVG existe
+  final svgFile = File(svgPath);
+  if (!await svgFile.exists()) {
+    throw 'SVG no encontrado en "$svgPath" (declarado en grafo.json)';
+  }
+
+  // Reglas 2-5: viewBox coherente con dimensiones
+  final svgContent = await svgFile.readAsString();
+  final viewBox = _extraerViewBox(svgContent);
+  if (viewBox == null) {
+    throw 'No se pudo extraer viewBox del SVG. Verificar que el archivo '
+        'tenga un atributo viewBox válido en el elemento <svg>.';
+  }
+
+  final esperadoAncho = anchoMetros * 100;
+  final esperadoAlto = altoMetros * 100;
+
+  if (viewBox.minX != 0 || viewBox.minY != 0) {
+    throw 'El viewBox del SVG debe empezar en "0 0", pero empieza en '
+        '"${viewBox.minX} ${viewBox.minY}". Ver docs/map-format.md.';
+  }
+
+  if ((viewBox.width - esperadoAncho).abs() > 1) {
+    throw 'Discrepancia de ancho:\n'
+        '  - viewBox del SVG: ${viewBox.width} px\n'
+        '  - mapa_ancho_metros × 100: ${esperadoAncho.toStringAsFixed(0)} px\n'
+        '  Diferencia: ${(viewBox.width - esperadoAncho).abs().toStringAsFixed(1)} px.\n'
+        '  Ajustar el viewBox del SVG o el "mapa_ancho_metros" en grafo.json.';
+  }
+
+  if ((viewBox.height - esperadoAlto).abs() > 1) {
+    throw 'Discrepancia de alto:\n'
+        '  - viewBox del SVG: ${viewBox.height} px\n'
+        '  - mapa_alto_metros × 100: ${esperadoAlto.toStringAsFixed(0)} px\n'
+        '  Diferencia: ${(viewBox.height - esperadoAlto).abs().toStringAsFixed(1)} px.\n'
+        '  Ajustar el viewBox del SVG o el "mapa_alto_metros" en grafo.json.';
+  }
+
+  // Regla 6: nodos dentro del piso
+  final nodos = grafo['nodos'] as List<dynamic>;
+  final nodosFuera = <String>[];
+  for (final n in nodos) {
+    final x = (n['x'] as num).toDouble();
+    final y = (n['y'] as num).toDouble();
+    if (x < 0 || x > anchoMetros || y < 0 || y > altoMetros) {
+      nodosFuera.add(
+          '  - "${n['id']}" en (${x.toStringAsFixed(2)}, ${y.toStringAsFixed(2)})');
+    }
+  }
+  if (nodosFuera.isNotEmpty) {
+    throw 'Nodos fuera del piso (dimensiones declaradas: '
+        '$anchoMetros×$altoMetros m):\n${nodosFuera.join("\n")}';
+  }
+
+  print('✓ Mapa y grafo coherentes:');
+  print('  - Piso: ${grafo['piso']} de ${grafo['edificio']}');
+  print('  - SVG: $svgPath');
+  print('  - Dimensiones: ${anchoMetros}m × ${altoMetros}m '
+      '(viewBox ${viewBox.width.toInt()}×${viewBox.height.toInt()} px)');
+  print('  - Escala: 100 px = 1 m');
+  print('  - Nodos: ${nodos.length}, todos dentro del piso');
+  return 0;
+}
+
+/// Datos del viewBox del SVG (los 4 números del atributo).
+class _ViewBox {
+  final double minX, minY, width, height;
+  const _ViewBox(this.minX, this.minY, this.width, this.height);
+}
+
+/// Extrae el viewBox de un SVG con un regex.
+///
+/// No usamos un parser XML completo porque solo necesitamos un atributo
+/// y queremos mantener cero dependencias en el tool. El regex tolera
+/// espacios y comas como separadores (ambos son válidos en SVG).
+_ViewBox? _extraerViewBox(String svgContent) {
+  final match = RegExp(r'viewBox\s*=\s*"([^"]+)"').firstMatch(svgContent);
+  if (match == null) return null;
+
+  final partes = match.group(1)!
+      .split(RegExp(r'[\s,]+'))
+      .where((s) => s.isNotEmpty)
+      .map(double.tryParse)
+      .toList();
+  if (partes.length != 4 || partes.any((p) => p == null)) return null;
+
+  return _ViewBox(partes[0]!, partes[1]!, partes[2]!, partes[3]!);
+}
+
 // ─── IO y utilidades ─────────────────────────────────────────────────────────
 
 Future<Map<String, dynamic>> _cargar() async {
@@ -398,6 +518,8 @@ COMANDOS:
   remove-arista --origen=X --destino=Y
                                 Elimina una arista
   validar                       Valida el grafo sin modificarlo
+  validar-mapa                  Valida coherencia entre el SVG y el grafo
+                                (viewBox, dimensiones, nodos dentro del piso)
 
 TIPOS DE NODO:
   ${_tiposValidos.join(", ")}

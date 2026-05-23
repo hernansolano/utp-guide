@@ -9,6 +9,7 @@ Esta carpeta contiene la documentación técnica del proyecto. El `README.md` ra
 | [`architecture.md`](architecture.md) | Visión general de la arquitectura del sistema, capas, flujos de datos y decisiones estructurales |
 | [`positioning-ble.md`](positioning-ble.md) | Cómo funciona el posicionamiento BLE: modelo de path-loss, trilateración, filtros, snap-to-graph |
 | [`grafo-format.md`](grafo-format.md) | Especificación del formato `grafo.json` + uso del GrafoEditor CLI |
+| [`map-format.md`](map-format.md) | Spec del formato SVG de planta: escala, viewBox, workflow de autoría |
 | [`setup-beacons.md`](setup-beacons.md) | Procedimiento de instalación física de balizas y calibración en campo |
 | [`adr/`](adr/README.md) | Architecture Decision Records — decisiones técnicas con contexto y justificación |
 

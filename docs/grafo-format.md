@@ -31,6 +31,8 @@ El archivo `assets/data/grafo.json` describe la planta del edificio como un graf
 
 Las dimensiones se usan para convertir coordenadas del grafo (metros) a píxeles del SVG.
 
+> **Importante:** el SVG referenciado en `mapa_svg` debe seguir el formato definido en [`map-format.md`](map-format.md). Específicamente: viewBox `0 0 (ancho_metros × 100) (alto_metros × 100)`, escala fija 100 px = 1 m, origen top-left. El comando `validar-mapa` del GrafoEditor verifica esta coherencia.
+
 ## Nodos
 
 Cada nodo es un punto en el plano (x, y) con un tipo. Los tipos definen cómo aparece el nodo en el buscador y qué icono recibe.
