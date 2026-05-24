@@ -29,6 +29,8 @@ Los ADRs son **inmutables**. Si una decisión se revierte o evoluciona, se crea 
 | [0005](0005-grafo-editor-cli.md) | GrafoEditor como CLI en Dart en lugar de pantalla in-app | aceptado | 2026-05-19 |
 | [0006](0006-formato-mapa-svg-metrico.md) | Formato de mapas: SVG vectorial con escala métrica fija | aceptado | 2026-05-19 |
 | [0007](0007-validacion-cruzada-mapa-grafo.md) | Validación cruzada entre el SVG del mapa y `grafo.json` | aceptado | 2026-05-19 |
+| [0008](0008-simulador-ble-para-testing.md) | Simulador BLE para testing sin hardware físico | aceptado | 2026-05-20 |
+| [0009](0009-pinning-dependencias.md) | Política de pinning de dependencias y auditoría de seguridad | aceptado | 2026-05-20 |
 
 ## Cómo crear un nuevo ADR
 

@@ -7,7 +7,8 @@ import '../data/repositories/grafo_repository.dart';
 import '../models/beacon_config.dart';
 import '../models/beacon_reading.dart';
 import '../models/position.dart';
-import 'ble_service.dart';
+import 'ble_service.dart' show BleEstado;
+import 'ble_source.dart';
 
 /// Convierte un stream de [BeaconReading] (lecturas crudas de BLE) en
 /// un stream de [Position] (posición estimada del usuario en el plano).
@@ -40,7 +41,7 @@ import 'ble_service.dart';
 /// lectura BLE. La frecuencia efectiva depende del intervalo de anuncio
 /// de las balizas (típicamente 2-5 Hz por baliza con iBeacon estándar).
 class PositioningService {
-  final BleService _ble;
+  final BleSource _ble;
   final BeaconRepository _beaconRepo;
   final GrafoRepository _grafoRepo;
 
@@ -53,6 +54,10 @@ class PositioningService {
   /// Lecturas suavizadas por baliza:
   ///   minor → (cola de distancias FIFO, timestamp de última lectura)
   final _lecturas = <int, _BeaconState>{};
+
+  /// Última posición calculada antes de aplicar snap-to-graph.
+  /// Se expone vía [debugPosicionCruda] para herramientas de debug.
+  Position? _debugPosicionCruda;
 
   final _controller = StreamController<Position?>.broadcast();
   StreamSubscription<BeaconReading>? _bleSub;
@@ -78,6 +83,29 @@ class PositioningService {
 
   /// Estado actual del escaneo BLE.
   BleEstado get estadoBleActual => _ble.estadoActual;
+
+  // ─── API de debug ────────────────────────────────────────────────────────
+
+  /// Última posición calculada antes del snap-to-graph.
+  /// Útil para visualizar cuánto desplazó el snap a la posición reportada.
+  /// `null` si no se ha calculado ninguna posición todavía.
+  Position? get debugPosicionCruda => _debugPosicionCruda;
+
+  /// Información detallada de la última lectura de cada baliza activa.
+  /// Snapshot sincrónico — para datos reactivos suscribirse a [posicionStream]
+  /// y consultar este getter en cada evento.
+  Map<int, BeaconDebugInfo> get debugLecturas {
+    _limpiarObsoletos();
+    return Map.unmodifiable({
+      for (final e in _lecturas.entries)
+        e.key: BeaconDebugInfo(
+          minor: e.key,
+          rssi: e.value.ultimaRssi ?? 0,
+          distanciaEstimada: e.value.promedio,
+          ultimaLectura: e.value.ultimoTimestamp,
+        ),
+    });
+  }
 
   PositioningService(this._ble, this._beaconRepo, this._grafoRepo);
 
@@ -110,10 +138,11 @@ class PositioningService {
             (txPower - lectura.rssi) / (10.0 * _calibracion.nExponentePerdida))
         .toDouble();
 
-    // 2. Actualizar media móvil de esta baliza
+    // 2. Actualizar media móvil de esta baliza (guardamos también el RSSI
+    //    crudo para diagnóstico — ver `debugLecturas`).
     final state = _lecturas.putIfAbsent(
         lectura.minor, () => _BeaconState(ventanaMax: _calibracion.ventanaMediaMovil));
-    state.agregar(distancia, lectura.timestamp);
+    state.agregar(distancia, lectura.rssi, lectura.timestamp);
 
     // 3. Limpiar balizas obsoletas (>expiracionLecturaSegundos sin nueva lectura)
     _limpiarObsoletos();
@@ -168,6 +197,10 @@ class PositioningService {
     // Clampar a los límites del piso (no permitir posiciones fuera del mapa).
     final x = (sumX / sumW).clamp(0.0, _dimensiones.anchoMetros);
     final y = (sumY / sumW).clamp(0.0, _dimensiones.altoMetros);
+
+    // Guardar la posición cruda antes del snap (para el overlay de debug).
+    _debugPosicionCruda =
+        Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
 
     return await _snapToGraph(x, y);
   }
@@ -239,22 +272,44 @@ class PositioningService {
   }
 }
 
-/// Estado interno por baliza: ventana FIFO de distancias suavizadas y
-/// timestamp de la última lectura.
+/// Estado interno por baliza: ventana FIFO de distancias suavizadas,
+/// último RSSI crudo y timestamp de la última lectura.
 class _BeaconState {
   final Queue<double> _ventana = Queue<double>();
   final int ventanaMax;
   DateTime ultimoTimestamp;
+  double? ultimaRssi; // último RSSI crudo, expuesto vía debugLecturas
 
   _BeaconState({required this.ventanaMax})
       : ultimoTimestamp = DateTime.now();
 
-  void agregar(double distancia, DateTime timestamp) {
+  void agregar(double distancia, double rssi, DateTime timestamp) {
     _ventana.add(distancia);
     if (_ventana.length > ventanaMax) _ventana.removeFirst();
+    ultimaRssi = rssi;
     ultimoTimestamp = timestamp;
   }
 
   double get promedio =>
       _ventana.isEmpty ? 0 : _ventana.reduce((a, b) => a + b) / _ventana.length;
+}
+
+/// Snapshot inmutable de la última lectura de una baliza.
+/// Expuesto por [PositioningService.debugLecturas] para herramientas de
+/// diagnóstico (overlay de debug, calibración en campo).
+class BeaconDebugInfo {
+  final int minor;
+  final double rssi;
+  final double distanciaEstimada;
+  final DateTime ultimaLectura;
+
+  const BeaconDebugInfo({
+    required this.minor,
+    required this.rssi,
+    required this.distanciaEstimada,
+    required this.ultimaLectura,
+  });
+
+  /// Edad de la lectura en milisegundos al momento de consultar.
+  int get edadMs => DateTime.now().difference(ultimaLectura).inMilliseconds;
 }

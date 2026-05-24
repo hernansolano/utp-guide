@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/beacon_reading.dart';
+import 'ble_source.dart';
 
 /// Estado del servicio de escaneo BLE.
 ///
@@ -26,6 +27,10 @@ enum BleEstado {
 
   /// El escaneo está activo y se están recibiendo (o no) anuncios.
   escaneando,
+
+  /// El servicio está emitiendo lecturas sintéticas desde una posición
+  /// virtual (modo simulación). No hay hardware real involucrado.
+  simulando,
 
   /// Error inesperado. La UI puede mostrar un mensaje genérico.
   error,
@@ -52,7 +57,7 @@ enum BleEstado {
 /// ble.beaconStream.listen((reading) { /* procesar lectura */ });
 /// await ble.iniciarEscaneo();
 /// ```
-class BleService {
+class BleService implements BleSource {
   // UUID del proyecto, definido en beacon_config.json.
   // Hardcoded aquí porque el servicio se inicializa antes de cargar el
   // repositorio; el UUID se usa para filtrar paquetes a nivel de parser.
@@ -66,20 +71,24 @@ class BleService {
   BleEstado _estadoActual = BleEstado.inactivo;
 
   /// Stream de lecturas de balizas que coinciden con el UUID del proyecto.
+  @override
   Stream<BeaconReading> get beaconStream => _beaconController.stream;
 
   /// Stream del estado del servicio. Útil para UI que necesita mostrar
   /// diálogos o mensajes de error específicos al usuario.
+  @override
   Stream<BleEstado> get estadoStream => _estadoController.stream;
 
   /// Último estado emitido. Útil para inicializar UI sin esperar el
   /// primer evento del stream.
+  @override
   BleEstado get estadoActual => _estadoActual;
 
   /// Inicia el ciclo completo: solicita permisos, verifica BT, escanea.
   ///
   /// Si los permisos se deniegan o BT está apagado, el servicio emite
   /// el estado correspondiente y retorna sin lanzar excepción.
+  @override
   Future<void> iniciarEscaneo() async {
     if (_activo) return;
 
@@ -164,6 +173,7 @@ class BleService {
   }
 
   /// Detiene el escaneo y libera recursos.
+  @override
   Future<void> detenerEscaneo() async {
     if (!_activo) {
       _emitir(BleEstado.inactivo);
@@ -234,6 +244,7 @@ class BleService {
     if (!_estadoController.isClosed) _estadoController.add(nuevo);
   }
 
+  @override
   void dispose() {
     detenerEscaneo();
     _beaconController.close();

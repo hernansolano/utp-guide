@@ -17,6 +17,10 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_blue_plus: ^1.31.0
   permission_handler: ^11.3.0
+  # Versión pineada exacta tras auditoría de seguridad (ver
+  # docs/adr/0009-pinning-dependencias.md). No subir sin revisar
+  # changelog y rehacer auditoría.
+  flutter_tts: 4.2.5
 
 dev_dependencies:
   flutter_test:

@@ -1,43 +1,87 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
 
+/// Pantalla de ajustes.
+///
+/// Recibe todos los `ValueNotifier<bool>` globales por constructor. Cada
+/// toggle de la lista está atado a uno de estos notifiers, y el cambio
+/// se propaga a toda la app vía rebuild reactivo. Para agregar un
+/// setting nuevo: crear el notifier en `main.dart`, pasarlo aquí por
+/// constructor, agregar un `_SettingsRow` con `value:` y `onToggle:`
+/// apuntando al notifier.
 class SettingsScreen extends StatelessWidget {
   final ValueNotifier<bool> darkModeNotifier;
+  final ValueNotifier<bool> accesibleSoloRutasNotifier;
+  final ValueNotifier<bool> vozHabilitadaNotifier;
+  final ValueNotifier<bool> textoGrandeNotifier;
+  final ValueNotifier<bool> arAutomaticoNotifier;
+  final ValueNotifier<bool> debugOverlayNotifier;
+  final ValueNotifier<bool> modoSimulacionNotifier;
 
-  const SettingsScreen({super.key, required this.darkModeNotifier});
+  const SettingsScreen({
+    super.key,
+    required this.darkModeNotifier,
+    required this.accesibleSoloRutasNotifier,
+    required this.vozHabilitadaNotifier,
+    required this.textoGrandeNotifier,
+    required this.arAutomaticoNotifier,
+    required this.debugOverlayNotifier,
+    required this.modoSimulacionNotifier,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
 
+    // Listenable.merge nos permite reconstruir la lista entera cuando
+    // cualquier notifier cambia, sin anidar ValueListenableBuilders.
     return Scaffold(
       backgroundColor: colors.bgSoft,
       body: Column(
         children: [
           _buildHeader(context, colors),
           Expanded(
-            child: ValueListenableBuilder<bool>(
-              valueListenable: darkModeNotifier,
-              builder: (context, isDark, _) => ListView(
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                darkModeNotifier,
+                accesibleSoloRutasNotifier,
+                vozHabilitadaNotifier,
+                textoGrandeNotifier,
+                arAutomaticoNotifier,
+                debugOverlayNotifier,
+                modoSimulacionNotifier,
+              ]),
+              builder: (context, _) => ListView(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                 children: [
                   _SettingsGroup(
                     label: 'Apariencia',
                     children: [
                       _SettingsRow(
-                        icon: isDark
+                        icon: darkModeNotifier.value
                             ? Icons.dark_mode_rounded
                             : Icons.light_mode_rounded,
                         title: 'Modo oscuro',
                         sub:
                             'Mejor para usar de noche o en interiores con poca luz.',
                         toggle: true,
-                        value: isDark,
-                        onToggle: () =>
-                            darkModeNotifier.value = !darkModeNotifier.value,
+                        value: darkModeNotifier.value,
+                        onToggle: () => darkModeNotifier.value =
+                            !darkModeNotifier.value,
+                        isLast: true,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.format_size_rounded,
+                        title: 'Texto grande',
+                        sub: 'Aumenta el tamaño en un 15 %.',
+                        toggle: true,
+                        value: textoGrandeNotifier.value,
+                        onToggle: () => textoGrandeNotifier.value =
+                            !textoGrandeNotifier.value,
                       ),
                     ],
                   ),
@@ -49,8 +93,9 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Solo rutas accesibles',
                         sub: 'Sin escaleras, con rampas y ascensor.',
                         toggle: true,
-                        value: false,
-                        onToggle: () {},
+                        value: accesibleSoloRutasNotifier.value,
+                        onToggle: () => accesibleSoloRutasNotifier.value =
+                            !accesibleSoloRutasNotifier.value,
                         isLast: true,
                       ),
                       _SettingsRow(
@@ -58,17 +103,9 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Indicaciones por voz',
                         sub: 'Lee el siguiente paso en voz alta.',
                         toggle: true,
-                        value: false,
-                        onToggle: () {},
-                      ),
-                      _SettingsRow(
-                        icon: Icons.format_size_rounded,
-                        title: 'Texto grande',
-                        sub: 'Aumenta el tamaño en un 15 %.',
-                        toggle: true,
-                        value: false,
-                        onToggle: () {},
-                        isLast: true,
+                        value: vozHabilitadaNotifier.value,
+                        onToggle: () => vozHabilitadaNotifier.value =
+                            !vozHabilitadaNotifier.value,
                       ),
                     ],
                   ),
@@ -85,12 +122,43 @@ class SettingsScreen extends StatelessWidget {
                         title: 'AR automático con teléfono vertical',
                         sub: 'Cambia de modo según la orientación.',
                         toggle: true,
-                        value: true,
-                        onToggle: () {},
+                        value: arAutomaticoNotifier.value,
+                        onToggle: () => arAutomaticoNotifier.value =
+                            !arAutomaticoNotifier.value,
                         isLast: true,
                       ),
                     ],
                   ),
+                  // Sección "Desarrollador" solo visible en builds de debug.
+                  // En release, los usuarios nunca ven estos toggles.
+                  if (kDebugMode)
+                    _SettingsGroup(
+                      label: 'Desarrollador',
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.science_outlined,
+                          title: 'Modo simulación',
+                          sub:
+                              'Genera lecturas BLE sintéticas desde el dedo sobre el mapa, '
+                              'sin necesidad de balizas reales.',
+                          toggle: true,
+                          value: modoSimulacionNotifier.value,
+                          onToggle: () => modoSimulacionNotifier.value =
+                              !modoSimulacionNotifier.value,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.bug_report_outlined,
+                          title: 'Mostrar overlay de debug',
+                          sub:
+                              'Métricas en vivo de BLE y posicionamiento sobre el mapa.',
+                          toggle: true,
+                          value: debugOverlayNotifier.value,
+                          onToggle: () => debugOverlayNotifier.value =
+                              !debugOverlayNotifier.value,
+                          isLast: true,
+                        ),
+                      ],
+                    ),
                   _SettingsGroup(
                     label: 'Acerca de',
                     children: [

@@ -14,9 +14,14 @@ UTP-Guide es una aplicación Flutter de navegación interior. La arquitectura si
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                       Service Layer                         │
-│  RoutingService (A*)                                        │
-│  BleService (escaneo iBeacon)                               │
+│  RoutingService     (A*)                                    │
 │  PositioningService (trilateración + filtros + snap)        │
+│  TtsService         (text-to-speech en español)             │
+│                                                             │
+│  BleSource (interfaz)                                       │
+│   ├─ BleService          (escaneo iBeacon real)             │
+│   ├─ SimulatedBleService (lecturas sintéticas para testing) │
+│   └─ BleSourceMultiplexer (conmuta entre las dos)           │
 └───────────────────────────┬─────────────────────────────────┘
                             │ consume vía constructor
                             ▼
@@ -33,7 +38,17 @@ UTP-Guide es una aplicación Flutter de navegación interior. La arquitectura si
 
 Los servicios y repositorios se instancian una sola vez en `main.dart` como singletons de archivo, y se inyectan por constructor a quien los necesite. No hay framework de DI.
 
-**Por qué:** En Fase 1 el proyecto tiene 3 servicios y 2 repositorios. Un framework de DI agregaría complejidad sin beneficio. Cuando se llegue a Fase 4 con TTS, sensores adicionales y servicios de telemetría, se evaluará migrar a Provider o Riverpod (ver [ADR-0004](adr/0004-permisos-runtime.md) para precedente similar).
+**Por qué:** El proyecto tiene 4 servicios y 2 repositorios. Un framework de DI agregaría complejidad sin beneficio. Cuando se llegue a una integración con telemetría remota o backend, se evaluará migrar a Provider o Riverpod.
+
+### 1b. Abstracción `BleSource`
+
+`PositioningService` consume `BleSource` (interfaz), no `BleService` concreto. Tres implementaciones coexisten:
+
+- `BleService` — escaneo iBeacon real con `flutter_blue_plus`
+- `SimulatedBleService` — genera lecturas sintéticas a partir de una posición virtual (drag-to-position), útil para testing sin hardware
+- `BleSourceMultiplexer` — conmuta entre las dos según `modoSimulacionNotifier`
+
+Esto permite alternar entre BLE real y simulado en runtime sin reiniciar el pipeline de posicionamiento. Ver [ADR-0008](adr/0008-simulador-ble-para-testing.md).
 
 ### 2. Datos de dominio en assets/, no en código
 

@@ -161,6 +161,20 @@ Todos los parámetros viven en `assets/data/beacon_config.json`:
 
 Si estos parámetros cambian, **no hace falta recompilar** la app: solo reemplazar el archivo en `assets/data/` y reiniciar.
 
+## Modo simulación (sin hardware)
+
+Para iterar el pipeline sin balizas físicas, la app incluye `SimulatedBleService`. Cuando el toggle "Modo simulación" en Settings está activo, el `BleSourceMultiplexer` reemplaza el escaneo real por uno sintético:
+
+1. El usuario arrastra el dedo sobre el mapa de `MapaScreen` para definir una "posición virtual"
+2. Cada 500 ms, el simulador recorre las balizas registradas en `beacon_config.json` y calcula la distancia desde la posición virtual a cada una
+3. Aplica el **inverso del modelo de path-loss** (`rssi = txPower − 10·n·log10(d)`) para producir un RSSI teórico
+4. Le agrega ruido gaussiano con σ = 3 dBm para imitar la variación natural
+5. Emite la lectura como `BeaconReading`, indistinguible de una real para el resto del pipeline
+
+El dot azul que aparece en el mapa es el resultado de procesar esas lecturas sintéticas con el mismo algoritmo de trilateración + snap-to-graph que se usa en producción. Una cruz roja marca la posición virtual donde el usuario soltó el dedo — comparar dot azul vs cruz roja es el indicador visual de qué tan bien calibrado está el sistema.
+
+Ver [ADR-0008](adr/0008-simulador-ble-para-testing.md) para el razonamiento completo.
+
 ## Pasos siguientes (Fase 2+)
 
 - **Filtro de Kalman** para suavizado temporal entre estimaciones consecutivas

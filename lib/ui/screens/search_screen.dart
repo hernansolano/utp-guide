@@ -12,7 +12,15 @@ import '../widgets/destination_row.dart';
 class SearchScreen extends StatefulWidget {
   final GrafoRepository grafoRepository;
 
-  const SearchScreen({super.key, required this.grafoRepository});
+  /// Si está activo, las rutas calculadas serán accesibles (sin escaleras).
+  /// Se inyecta desde `main.dart`; el toggle vive en SettingsScreen.
+  final ValueNotifier<bool> accesibleSoloRutasNotifier;
+
+  const SearchScreen({
+    super.key,
+    required this.grafoRepository,
+    required this.accesibleSoloRutasNotifier,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -303,9 +311,17 @@ class _SearchScreenState extends State<SearchScreen> {
       );
 
   void _navegarA(BuildContext context, Nodo nodo) {
+    // El perfil se decide en este momento (no en MapaScreen) para que la
+    // navegación quede congelada con el perfil activo al hacer la búsqueda.
+    // Si el usuario cambia el toggle después, la ruta actual no se altera;
+    // solo afecta búsquedas futuras.
+    final perfil = widget.accesibleSoloRutasNotifier.value
+        ? PerfilMovilidad.accesible
+        : PerfilMovilidad.estandar;
+
     context.push('/mapa', extra: {
       'destinoId': nodo.id,
-      'perfil': PerfilMovilidad.estandar.name,
+      'perfil': perfil.name,
     });
   }
 }
