@@ -8,7 +8,11 @@ UTP-Guide es una aplicación Flutter de navegación interior. La arquitectura si
 ┌─────────────────────────────────────────────────────────────┐
 │                          UI Layer                           │
 │  Screens (HomeScreen, SearchScreen, MapaScreen, Settings)   │
-│  Widgets (MapaPainter, BottomNav, PillButton, etc.)         │
+│  Widgets:                                                   │
+│   - MapView (+ MapViewController): cámara, pan, zoom, seguir │
+│   - MinimapWidget (delegado a MapView en modo compacto)     │
+│   - MapaPainter: pintura raw de ruta + dot (usado por MapView)│
+│   - BottomNav, PillButton, QuickTile, DestinationRow, ...   │
 └───────────────────────────┬─────────────────────────────────┘
                             │ consume vía constructor
                             ▼

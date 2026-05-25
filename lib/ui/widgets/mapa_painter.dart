@@ -127,5 +127,8 @@ class MapaPainter extends CustomPainter {
   bool shouldRepaint(MapaPainter old) =>
       old.ruta != ruta ||
       old.posicionUsuario != posicionUsuario ||
-      old.routeColor != routeColor;
+      old.routeColor != routeColor ||
+      old.destinationColor != destinationColor ||
+      old.userColor != userColor ||
+      old.mapaSize != mapaSize;
 }

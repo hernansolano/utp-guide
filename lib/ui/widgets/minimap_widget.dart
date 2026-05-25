@@ -2,8 +2,15 @@ import 'package:flutter/material.dart';
 import '../../models/nodo.dart';
 import '../../models/position.dart';
 import '../theme/app_theme.dart';
-import 'mapa_painter.dart';
+import 'map_view.dart';
 
+/// Minimapa de 140×140 usado en el modo AR.
+///
+/// Reusa [MapView] en modo compacto (pan/zoom desactivado, sin
+/// callbacks de interacción) para garantizar que el dot del usuario
+/// se renderice correctamente respecto al SVG. Antes usaba un
+/// `CustomPaint` directo, lo que arrastraba el mismo bug de
+/// letterboxing que tenía MapaScreen pre-refactor.
 class MinimapWidget extends StatelessWidget {
   final List<Nodo> ruta;
   final Position? posicionUsuario;
@@ -35,13 +42,15 @@ class MinimapWidget extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: CustomPaint(
-          painter: MapaPainter.fromContext(
-            context,
-            ruta: ruta,
-            mapaSize: mapaSize,
-            posicionUsuario: posicionUsuario,
-          ),
+        child: MapView(
+          mapaSize: mapaSize,
+          // El minimapa no muestra el SVG de fondo, solo la ruta y el dot.
+          // Esto deja claro el "mapa interno" sin distraer con paredes.
+          svgAsset: null,
+          ruta: ruta,
+          posicionUsuario: posicionUsuario,
+          // El minimapa es read-only: ni pan, ni zoom, ni taps.
+          panZoomHabilitado: false,
         ),
       ),
     );
