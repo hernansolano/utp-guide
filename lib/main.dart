@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'data/repositories/beacon_repository.dart';
 import 'data/repositories/grafo_repository.dart';
+import 'models/beacon_config.dart';
 import 'models/perfil_movilidad.dart';
 import 'models/position.dart';
 import 'services/ble_service.dart';
@@ -11,6 +12,7 @@ import 'services/positioning_service.dart';
 import 'services/routing_service.dart';
 import 'services/simulated_ble_service.dart';
 import 'services/tts_service.dart';
+import 'ui/screens/calibracion_screen.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/mapa_screen.dart';
 import 'ui/screens/search_screen.dart';
@@ -33,22 +35,22 @@ final arAutomaticoNotifier          = ValueNotifier<bool>(true);
 final debugOverlayNotifier          = ValueNotifier<bool>(kDebugMode);
 
 /// Si true, el sistema usa el simulador BLE en lugar del escaneo real.
-/// Solo visible en builds de debug. Ver
-/// `docs/adr/0008-simulador-ble-para-testing.md`.
 final modoSimulacionNotifier        = ValueNotifier<bool>(false);
 
-/// Posición virtual del usuario en modo simulación. Se actualiza desde
-/// MapaScreen via drag-to-position. SimulatedBleService la lee cada
-/// ciclo para generar lecturas sintéticas como si el usuario estuviera
-/// realmente ahí.
+/// Posición virtual del usuario en modo simulación.
 final posicionVirtualNotifier       = ValueNotifier<Position?>(null);
 
+/// Calibración activa del sistema de posicionamiento.
+///
+/// Se inicializa con los valores de `beacon_config.json` al arrancar la
+/// app y se puede modificar en runtime desde `CalibracionScreen`. El
+/// `PositioningService` escucha este notifier y aplica los cambios
+/// inmediatamente a las próximas lecturas. Ver
+/// `docs/adr/0011-calibracion-en-campo.md`.
+final calibracionNotifier =
+    ValueNotifier<CalibracionPositioning>(CalibracionPositioning.defaults);
+
 // ─── Servicios de posicionamiento ────────────────────────────────────────────
-//
-// El BleService real y el SimulatedBleService viven simultáneamente; el
-// BleSourceMultiplexer reenvía al que esté activo según
-// modoSimulacionNotifier. PositioningService consume solo la abstracción
-// BleSource y no sabe (ni le importa) si los datos son reales o sintéticos.
 
 final _bleServiceReal     = BleService();
 final _bleServiceSimulado = SimulatedBleService(
@@ -66,6 +68,7 @@ final _positioningService = PositioningService(
   _bleSource,
   _beaconRepository,
   _grafoRepository,
+  calibracionNotifier,
 );
 final _ttsService         = TtsService();
 
@@ -114,11 +117,28 @@ final _router = GoRouter(
         modoSimulacionNotifier: modoSimulacionNotifier,
       ),
     ),
+    GoRoute(
+      path: '/calibracion',
+      builder: (_, _) => CalibracionScreen(
+        positioningService: _positioningService,
+        beaconRepository: _beaconRepository,
+        calibracionNotifier: calibracionNotifier,
+      ),
+    ),
   ],
 );
 
 // ─── App ──────────────────────────────────────────────────────────────────────
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Cargar calibración inicial desde beacon_config.json antes de levantar
+  // la UI. Si falla, el notifier se queda con los defaults de
+  // CalibracionPositioning.defaults (definidos en beacon_config.dart).
+  try {
+    calibracionNotifier.value = await _beaconRepository.obtenerCalibracion();
+  } catch (_) {
+    // Defaults ya están seteados — log opcional aquí en el futuro.
+  }
   runApp(const UtpGuideApp());
 }
 

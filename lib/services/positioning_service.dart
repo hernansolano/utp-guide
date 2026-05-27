@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Offset;
 import '../data/repositories/beacon_repository.dart';
 import '../data/repositories/grafo_repository.dart';
@@ -37,16 +38,28 @@ import 'ble_source.dart';
 ///    cualquier arista del grafo, si está dentro de la tolerancia
 ///    configurada. Ver `docs/adr/0003-snap-to-graph-aristas.md`.
 ///
-/// El servicio emite la posición estimada cada vez que llega una nueva
-/// lectura BLE. La frecuencia efectiva depende del intervalo de anuncio
-/// de las balizas (típicamente 2-5 Hz por baliza con iBeacon estándar).
+/// **Calibración en vivo (ADR-0011):** la calibración se recibe vía
+/// `ValueListenable<CalibracionPositioning>`. Cuando el listenable
+/// notifica un cambio, los nuevos valores aplican inmediatamente a las
+/// próximas lecturas. La ventana de media móvil contiene valores ya
+/// convertidos a distancia, así que un cambio brusco de `n` tarda
+/// `ventanaMediaMovil` lecturas en converger. Para efecto instantáneo,
+/// el consumidor puede llamar [resetearVentanas].
+///
+/// **Ref counting (lifecycle):** [iniciar] y [detener] usan ref counting.
+/// Múltiples consumidores (ej: MapaScreen y CalibracionScreen) pueden
+/// llamar `iniciar()` y el servicio solo se levanta una vez. Solo cuando
+/// el último consumidor llama `detener()`, el servicio se apaga de verdad.
 class PositioningService {
   final BleSource _ble;
   final BeaconRepository _beaconRepo;
   final GrafoRepository _grafoRepo;
+  final ValueListenable<CalibracionPositioning> _calibracionListenable;
 
-  // Calibración cargada al iniciar (cacheada para el ciclo de vida del servicio).
-  CalibracionPositioning _calibracion = CalibracionPositioning.defaults;
+  /// Cache local de la calibración. Se actualiza vía listener del
+  /// [_calibracionListenable], permitiendo cambios en runtime sin
+  /// reiniciar el servicio.
+  CalibracionPositioning _calibracion;
 
   // Dimensiones del mapa cargadas del grafo (default = cuarto de prueba 5x5).
   DimensionesMapa _dimensiones = const DimensionesMapa(5.0, 5.0);
@@ -62,9 +75,23 @@ class PositioningService {
   final _controller = StreamController<Position?>.broadcast();
   StreamSubscription<BeaconReading>? _bleSub;
 
+  /// Cantidad de consumidores que llamaron `iniciar()` sin un
+  /// `detener()` correspondiente. El servicio se mantiene activo
+  /// mientras este contador > 0.
+  int _refCount = 0;
+
   /// Stream de posición estimada del usuario. Emite `null` cuando no
   /// hay balizas visibles o todas están expiradas.
   Stream<Position?> get posicionStream => _controller.stream;
+
+  /// Stream de lecturas crudas de BLE (mismas que recibe el servicio
+  /// antes de aplicarles path-loss y media móvil).
+  ///
+  /// Útil para herramientas de calibración que necesitan los RSSI
+  /// originales para calcular estadísticas propias. No procesado por
+  /// el servicio — el consumidor recibe la misma data que llega del
+  /// `BleSource`.
+  Stream<BeaconReading> get beaconStreamRaw => _ble.beaconStream;
 
   /// Cantidad de balizas distintas con lecturas no expiradas.
   ///
@@ -75,10 +102,6 @@ class PositioningService {
   }
 
   /// Stream del estado del escaneo BLE subyacente.
-  ///
-  /// Re-expuesto desde [BleService] para que la UI pueda mostrar
-  /// diálogos de "Activa Bluetooth" o "Permisos negados" sin depender
-  /// directamente del servicio BLE de bajo nivel.
   Stream<BleEstado> get estadoBleStream => _ble.estadoStream;
 
   /// Estado actual del escaneo BLE.
@@ -88,12 +111,9 @@ class PositioningService {
 
   /// Última posición calculada antes del snap-to-graph.
   /// Útil para visualizar cuánto desplazó el snap a la posición reportada.
-  /// `null` si no se ha calculado ninguna posición todavía.
   Position? get debugPosicionCruda => _debugPosicionCruda;
 
   /// Información detallada de la última lectura de cada baliza activa.
-  /// Snapshot sincrónico — para datos reactivos suscribirse a [posicionStream]
-  /// y consultar este getter en cada evento.
   Map<int, BeaconDebugInfo> get debugLecturas {
     _limpiarObsoletos();
     return Map.unmodifiable({
@@ -107,28 +127,52 @@ class PositioningService {
     });
   }
 
-  PositioningService(this._ble, this._beaconRepo, this._grafoRepo);
+  PositioningService(
+    this._ble,
+    this._beaconRepo,
+    this._grafoRepo,
+    this._calibracionListenable,
+  ) : _calibracion = _calibracionListenable.value {
+    _calibracionListenable.addListener(_onCalibracionCambio);
+  }
 
-  /// Carga la configuración y arranca el escaneo BLE.
+  void _onCalibracionCambio() {
+    _calibracion = _calibracionListenable.value;
+  }
+
+  /// Arranca el escaneo BLE y la subscripción a lecturas.
   ///
-  /// La calibración se lee una sola vez al iniciar. Si cambian los
-  /// parámetros en `beacon_config.json`, llamar `detener()` y `iniciar()`
-  /// para recargar.
+  /// Idempotente con ref counting: si ya hay otros consumidores activos,
+  /// solo incrementa el contador. La inicialización real solo ocurre la
+  /// primera vez.
   Future<void> iniciar() async {
-    // Cargar parámetros desde los repositorios antes de empezar a recibir lecturas.
-    _calibracion = await _beaconRepo.obtenerCalibracion();
-    _dimensiones = await _grafoRepo.obtenerDimensionesMapa();
+    _refCount++;
+    if (_refCount > 1) return; // ya inicializado por otro consumidor
 
+    _dimensiones = await _grafoRepo.obtenerDimensionesMapa();
     _bleSub = _ble.beaconStream.listen(_procesarLectura);
     await _ble.iniciarEscaneo();
   }
 
-  /// Detiene el escaneo y limpia el estado interno.
+  /// Decrementa el ref count. Solo apaga el servicio cuando el contador
+  /// llega a cero (último consumidor cerró).
   Future<void> detener() async {
+    if (_refCount <= 0) return; // ya detenido
+    _refCount--;
+    if (_refCount > 0) return; // otros consumidores siguen usando
+
     await _bleSub?.cancel();
     _bleSub = null;
     _lecturas.clear();
     await _ble.detenerEscaneo();
+  }
+
+  /// Limpia las ventanas de media móvil de todas las balizas. Útil para
+  /// aplicar inmediatamente cambios de calibración sin esperar que la
+  /// media móvil converja.
+  void resetearVentanas() {
+    _lecturas.clear();
+    _debugPosicionCruda = null;
   }
 
   Future<void> _procesarLectura(BeaconReading lectura) async {
@@ -138,13 +182,14 @@ class PositioningService {
             (txPower - lectura.rssi) / (10.0 * _calibracion.nExponentePerdida))
         .toDouble();
 
-    // 2. Actualizar media móvil de esta baliza (guardamos también el RSSI
-    //    crudo para diagnóstico — ver `debugLecturas`).
+    // 2. Actualizar media móvil de esta baliza
     final state = _lecturas.putIfAbsent(
         lectura.minor, () => _BeaconState(ventanaMax: _calibracion.ventanaMediaMovil));
+    // Ajustar la ventana si el setting cambió en vivo.
+    state.ajustarVentanaMax(_calibracion.ventanaMediaMovil);
     state.agregar(distancia, lectura.rssi, lectura.timestamp);
 
-    // 3. Limpiar balizas obsoletas (>expiracionLecturaSegundos sin nueva lectura)
+    // 3. Limpiar balizas obsoletas
     _limpiarObsoletos();
 
     // 4 + 5. Trilateración + snap-to-graph
@@ -156,14 +201,10 @@ class PositioningService {
     try {
       return await _beaconRepo.obtenerTxPower(minor);
     } catch (_) {
-      // Si el minor no está registrado, asumir default y seguir.
       return _calibracion.txPowerDbmDefault;
     }
   }
 
-  /// Elimina del mapa las balizas cuya última lectura es más vieja que
-  /// `expiracionLecturaSegundos`. Mantener una baliza fantasma con
-  /// lecturas viejas sesga la trilateración.
   void _limpiarObsoletos() {
     final ahora = DateTime.now();
     final umbral = Duration(seconds: _calibracion.expiracionLecturaSegundos);
@@ -171,7 +212,6 @@ class PositioningService {
         ahora.difference(state.ultimoTimestamp) > umbral);
   }
 
-  /// Centroide ponderado de todas las balizas activas, con peso 1/d².
   Future<Position?> _trilaterar() async {
     if (_lecturas.isEmpty) return null;
 
@@ -181,32 +221,26 @@ class PositioningService {
       try {
         final config = await _beaconRepo.obtenerConfigBeacon(entry.key);
         final avgDist = entry.value.promedio;
-        // Evitar división por cero con distancias muy pequeñas.
-        // 0.01 m² = 10 cm como mínimo, conservador.
         final w = 1.0 / max(avgDist * avgDist, 0.01);
         sumX += config.x * w;
         sumY += config.y * w;
         sumW += w;
       } catch (_) {
-        // Baliza no registrada en beacon_config.json — ignorar.
+        // ignore
       }
     }
 
     if (sumW == 0) return null;
 
-    // Clampar a los límites del piso (no permitir posiciones fuera del mapa).
     final x = (sumX / sumW).clamp(0.0, _dimensiones.anchoMetros);
     final y = (sumY / sumW).clamp(0.0, _dimensiones.altoMetros);
 
-    // Guardar la posición cruda antes del snap (para el overlay de debug).
     _debugPosicionCruda =
         Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
 
     return await _snapToGraph(x, y);
   }
 
-  /// Proyecta la posición cruda al punto más cercano de cualquier
-  /// arista del grafo, si está dentro de la tolerancia configurada.
   Future<Position> _snapToGraph(double x, double y) async {
     try {
       final nodos = await _grafoRepo.obtenerNodos();
@@ -231,8 +265,6 @@ class PositioningService {
         }
       }
 
-      // Si está demasiado lejos del grafo, reportar posición cruda.
-      // Esto cubre casos donde el usuario salió de la zona modelada.
       final dentroDeTolerancia =
           minDist <= _calibracion.toleranciaSnapMetros;
       final finalX = dentroDeTolerancia ? snapX : x;
@@ -241,20 +273,14 @@ class PositioningService {
       return Position(
         x: finalX,
         y: finalY,
-        piso: 1, // TODO Fase 2: leer del Major del iBeacon
+        piso: 1,
         timestamp: DateTime.now(),
       );
     } catch (_) {
-      // Si el grafo falla por alguna razón, devolver la posición cruda
-      // en lugar de no devolver nada — degradación graceful.
       return Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
     }
   }
 
-  /// Punto más cercano del segmento `[ab]` al punto `(px, py)`.
-  ///
-  /// Si el pie de perpendicular cae fuera del segmento, se devuelve el
-  /// extremo más cercano. Algoritmo estándar de geometría computacional.
   Offset _puntoEnSegmento(
       double px, double py, double ax, double ay, double bx, double by) {
     final dx = bx - ax;
@@ -267,7 +293,13 @@ class PositioningService {
   }
 
   void dispose() {
-    detener();
+    _calibracionListenable.removeListener(_onCalibracionCambio);
+    // Forzar shutdown sin importar el ref count.
+    _refCount = 0;
+    _bleSub?.cancel();
+    _bleSub = null;
+    _lecturas.clear();
+    _ble.detenerEscaneo();
     _controller.close();
   }
 }
@@ -276,12 +308,23 @@ class PositioningService {
 /// último RSSI crudo y timestamp de la última lectura.
 class _BeaconState {
   final Queue<double> _ventana = Queue<double>();
-  final int ventanaMax;
+  int ventanaMax;
   DateTime ultimoTimestamp;
-  double? ultimaRssi; // último RSSI crudo, expuesto vía debugLecturas
+  double? ultimaRssi;
 
   _BeaconState({required this.ventanaMax})
       : ultimoTimestamp = DateTime.now();
+
+  /// Ajusta la capacidad de la ventana en runtime. Si la nueva capacidad
+  /// es menor, recorta las muestras más viejas. Permite cambiar la
+  /// ventana de media móvil en vivo desde la calibración.
+  void ajustarVentanaMax(int nuevoMax) {
+    if (nuevoMax == ventanaMax) return;
+    ventanaMax = nuevoMax;
+    while (_ventana.length > ventanaMax) {
+      _ventana.removeFirst();
+    }
+  }
 
   void agregar(double distancia, double rssi, DateTime timestamp) {
     _ventana.add(distancia);
@@ -295,8 +338,6 @@ class _BeaconState {
 }
 
 /// Snapshot inmutable de la última lectura de una baliza.
-/// Expuesto por [PositioningService.debugLecturas] para herramientas de
-/// diagnóstico (overlay de debug, calibración en campo).
 class BeaconDebugInfo {
   final int minor;
   final double rssi;
@@ -310,6 +351,5 @@ class BeaconDebugInfo {
     required this.ultimaLectura,
   });
 
-  /// Edad de la lectura en milisegundos al momento de consultar.
   int get edadMs => DateTime.now().difference(ultimaLectura).inMilliseconds;
 }

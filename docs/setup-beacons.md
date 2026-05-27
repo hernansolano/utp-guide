@@ -84,7 +84,20 @@ Una vez instaladas, registrar todas las balizas en `assets/data/beacon_config.js
 
 > **Nota:** el `txPower_dbm` en el archivo es el RSSI **medido a 1 metro de distancia**, no la potencia de transmisión configurada en la baliza. Estos números son diferentes. Ver paso 5.
 
-## 5. Calibración del `txPower` por baliza
+## 5. Calibración con la pantalla `/calibracion`
+
+Desde la versión actual, el procedimiento de campo se hace dentro de la app. Abrir Ajustes → Desarrollador → "Calibración BLE (campo)". Ahí:
+
+1. **Stats en vivo:** cada baliza detectada muestra RSSI actual y promedio sobre N muestras, con desviación estándar y distancia calculada usando la calibración vigente.
+2. **Herramienta "Distancia conocida":** ingresá la distancia real desde donde estás parado y la app sugiere qué valor de `n` o `txPower` haría que el cálculo coincida con la realidad.
+3. **Sliders en vivo:** mové `n`, ventana de media móvil y tolerancia de snap para ver el efecto inmediatamente. Cuando los valores se sientan bien, copiá el bloque JSON sugerido en la sección "Aplicar permanentemente" y pegalo en `assets/data/beacon_config.json`.
+4. **Export CSV:** botón de copia al portapapeles que produce un CSV listo para pegar en Sheets/Excel.
+
+La pantalla solo aparece en builds de debug (`kDebugMode`). En release no es accesible.
+
+Las secciones 5 y 6 originales (cálculo manual de `txPower` y `n`) se mantienen abajo para referencia teórica y para casos donde la pantalla no esté disponible (por ejemplo, build de release antes de un deploy).
+
+## 5b. Calibración manual del `txPower` por baliza
 
 Para cada baliza, medir el RSSI a 1 metro exacto:
 

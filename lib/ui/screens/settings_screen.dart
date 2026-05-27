@@ -155,6 +155,14 @@ class SettingsScreen extends StatelessWidget {
                           value: debugOverlayNotifier.value,
                           onToggle: () => debugOverlayNotifier.value =
                               !debugOverlayNotifier.value,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.tune_rounded,
+                          title: 'Calibración BLE (campo)',
+                          sub:
+                              'Ver lecturas en vivo, ajustar n y txPower, '
+                              'exportar muestras como CSV.',
+                          onTap: () => context.push('/calibracion'),
                           isLast: true,
                         ),
                       ],
@@ -271,6 +279,7 @@ class _SettingsRow extends StatelessWidget {
   final bool toggle;
   final bool value;
   final VoidCallback? onToggle;
+  final VoidCallback? onTap;
   final bool isLast;
 
   const _SettingsRow({
@@ -281,13 +290,14 @@ class _SettingsRow extends StatelessWidget {
     this.toggle = false,
     this.value = false,
     this.onToggle,
+    this.onTap,
     this.isLast = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Column(
+    final fila = Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -372,11 +382,20 @@ class _SettingsRow extends StatelessWidget {
                     color: colors.fgMuted,
                   ),
                 ),
+              if (!toggle && trailing == null && onTap != null)
+                Icon(Icons.chevron_right_rounded, color: colors.fgSoft, size: 20),
             ],
           ),
         ),
         if (!isLast) Divider(height: 1, color: colors.line),
       ],
     );
+
+    // Si la fila es navegable (tiene onTap pero no es un toggle), la
+    // envolvemos en InkWell para el feedback de tap.
+    if (onTap != null && !toggle) {
+      return InkWell(onTap: onTap, child: fila);
+    }
+    return fila;
   }
 }
