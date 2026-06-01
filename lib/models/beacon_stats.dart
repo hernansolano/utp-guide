@@ -19,12 +19,17 @@ class BeaconStats {
   final List<double> _distancia = [];
   DateTime? ultimoTimestamp;
 
+  /// Timestamp de la primera lectura agregada. Se usa con [ultimoTimestamp]
+  /// para calcular la tasa de emisión observada ([tasaHz]).
+  DateTime? primerTimestamp;
+
   BeaconStats({required this.minor, this.descripcion});
 
   /// Agrega una muestra de RSSI con su distancia calculada.
   void agregar(double rssi, double distanciaCalculada, DateTime timestamp) {
     _rssi.add(rssi);
     _distancia.add(distanciaCalculada);
+    primerTimestamp ??= timestamp;
     ultimoTimestamp = timestamp;
   }
 
@@ -33,6 +38,7 @@ class BeaconStats {
   void reset() {
     _rssi.clear();
     _distancia.clear();
+    primerTimestamp = null;
     ultimoTimestamp = null;
   }
 
@@ -90,6 +96,95 @@ class BeaconStats {
     if (ultimoTimestamp == null) return null;
     return DateTime.now().difference(ultimoTimestamp!).inMilliseconds;
   }
+
+  /// Tasa de emisión observada en Hz (lecturas por segundo). Calculada
+  /// sobre la ventana completa (desde la primera muestra hasta la
+  /// última). Útil para detectar balizas con problemas: una baliza
+  /// iBeacon estándar emite a ~1-2 Hz; tasas mucho menores indican
+  /// pérdida de paquetes, batería baja o configuración con intervalo
+  /// muy largo.
+  double get tasaHz {
+    if (samples < 2 || primerTimestamp == null || ultimoTimestamp == null) {
+      return 0;
+    }
+    final ms = ultimoTimestamp!.difference(primerTimestamp!).inMilliseconds;
+    if (ms <= 0) return 0;
+    return samples * 1000 / ms;
+  }
+
+  /// Evaluación de la "salud" de las lecturas de esta baliza basada en
+  /// tasa de emisión, σ del RSSI y edad de la última lectura.
+  ///
+  /// Útil para detectar problemas de instalación o configuración en
+  /// campo sin tener que interpretar manualmente los números crudos.
+  SaludBaliza get salud {
+    if (samples == 0) return SaludBaliza.sinDatos;
+    if (samples < 30) return SaludBaliza.midiendo;
+
+    final edad = edadMs;
+    final tasa = tasaHz;
+    final sigma = rssiStdDev;
+
+    // Problemas claros (rojo): baliza fuera de alcance, tasa muy baja,
+    // señal extremadamente inestable.
+    if (edad != null && edad > 3000) return SaludBaliza.problema;
+    if (tasa < 0.5) return SaludBaliza.problema;
+    if (sigma > 6) return SaludBaliza.problema;
+
+    // Warnings (amarillo): condiciones subóptimas pero no rotas.
+    if (edad != null && edad > 1500) return SaludBaliza.warning;
+    if (tasa < 1.0) return SaludBaliza.warning;
+    if (sigma > 4) return SaludBaliza.warning;
+
+    return SaludBaliza.ok;
+  }
+
+  /// Texto humano explicando el estado de [salud]. Usado en el tooltip
+  /// del indicador en la pantalla de calibración.
+  String get razonSalud {
+    if (samples == 0) return 'Sin lecturas';
+    if (samples < 30) return 'Midiendo ($samples/30 muestras)';
+
+    final edad = edadMs;
+    final tasa = tasaHz;
+    final sigma = rssiStdDev;
+
+    if (edad != null && edad > 3000) {
+      return 'Fuera de alcance hace ${(edad / 1000).toStringAsFixed(1)} s';
+    }
+    if (tasa < 0.5) return 'Tasa muy baja: ${tasa.toStringAsFixed(2)} Hz';
+    if (sigma > 6) {
+      return 'Señal muy ruidosa: σ ${sigma.toStringAsFixed(1)} dBm';
+    }
+
+    if (edad != null && edad > 1500) {
+      return 'Edad alta: ${(edad / 1000).toStringAsFixed(1)} s';
+    }
+    if (tasa < 1.0) return 'Tasa moderada: ${tasa.toStringAsFixed(2)} Hz';
+    if (sigma > 4) return 'Ruido moderado: σ ${sigma.toStringAsFixed(1)} dBm';
+
+    return 'OK · ${tasa.toStringAsFixed(1)} Hz, σ ${sigma.toStringAsFixed(1)} dBm';
+  }
+}
+
+/// Estado de salud agregado de una baliza durante una sesión de
+/// calibración, derivado de tasa de emisión, σ del RSSI y edad de la
+/// última lectura.
+enum SaludBaliza {
+  /// Sin samples todavía.
+  sinDatos,
+
+  /// Acumulando primeras muestras (<30); las stats no son confiables aún.
+  midiendo,
+
+  /// Todos los chequeos pasan.
+  ok,
+
+  /// Algún chequeo subóptimo pero la baliza funciona.
+  warning,
+
+  /// Problema claro: tasa muy baja, σ muy alta, o fuera de alcance.
+  problema,
 }
 
 /// Acumula errores de posición durante una validación end-to-end de

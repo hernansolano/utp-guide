@@ -951,25 +951,64 @@ class _FilaBeacon extends StatelessWidget {
       etiquetaEdad = '${edad}ms';
     }
 
+    // Dot de salud — color según la evaluación de tasa/σ/edad.
+    final Color colorSalud;
+    switch (stats.salud) {
+      case SaludBaliza.ok:
+        colorSalud = colors.success;
+      case SaludBaliza.warning:
+        colorSalud = Colors.orange.shade700;
+      case SaludBaliza.problema:
+        colorSalud = colors.danger;
+      case SaludBaliza.midiendo:
+        colorSalud = colors.brand;
+      case SaludBaliza.sinDatos:
+        colorSalud = colors.fgSoft;
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: colors.brandSoft,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            '${stats.minor}',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: colors.brand,
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.brandSoft,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${stats.minor}',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: colors.brand,
+                ),
+              ),
             ),
-          ),
+            // Indicador de salud (esquina superior derecha del minor).
+            // Tooltip explica la razón en lenguaje humano.
+            Positioned(
+              right: -3,
+              top: -3,
+              child: Tooltip(
+                message: stats.razonSalud,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: colorSalud,
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: colors.surface, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(width: 12),
         Expanded(
