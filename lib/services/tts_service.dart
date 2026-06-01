@@ -24,6 +24,16 @@ class TtsService {
   final FlutterTts _tts = FlutterTts();
   bool _inicializado = false;
 
+  /// True si el motor TTS respondió correctamente en la primera
+  /// inicialización. False si lanzó excepción (motor no instalado,
+  /// idioma no soportado, etc.). Null antes del primer intento.
+  ///
+  /// Cuando es false, [hablar] retorna sin lanzar — TTS es un accesorio,
+  /// no crítico. La UI puede consultar este getter para ocultar
+  /// controles de voz si quiere ser explícita, pero no es obligatorio.
+  bool? _disponible;
+  bool? get disponible => _disponible;
+
   /// Idioma BCP-47. `es-ES` se elige sobre `es-419` o `es-MX` porque
   /// es el más universalmente soportado por motores TTS del sistema en
   /// Android e iOS. Si el dispositivo no tiene español instalado, la
@@ -41,31 +51,55 @@ class TtsService {
   /// Volumen relativo dentro del rango del sistema. 1.0 = máximo.
   static const _volumen = 1.0;
 
-  Future<void> _asegurarInicializado() async {
-    if (_inicializado) return;
-    // Estas llamadas son idempotentes y de bajo costo; las hacemos solo
-    // la primera vez para evitar latencia en la primera locución.
-    await _tts.setLanguage(_idioma);
-    await _tts.setSpeechRate(_velocidad);
-    await _tts.setPitch(_tono);
-    await _tts.setVolume(_volumen);
-    _inicializado = true;
+  /// Inicializa el motor TTS la primera vez que se necesita. Devuelve
+  /// true si todo funcionó, false si el motor no está disponible.
+  /// Caches el resultado en [_disponible] para no reintentar.
+  Future<bool> _asegurarInicializado() async {
+    if (_inicializado) return _disponible ?? false;
+    try {
+      await _tts.setLanguage(_idioma);
+      await _tts.setSpeechRate(_velocidad);
+      await _tts.setPitch(_tono);
+      await _tts.setVolume(_volumen);
+      _inicializado = true;
+      _disponible = true;
+      return true;
+    } catch (_) {
+      // Casos típicos: dispositivo sin motor TTS, idioma no soportado,
+      // emulador sin Google Play Services. Falla silenciosa — la voz es
+      // accesorio, la navegación funciona sin ella.
+      _inicializado = true;
+      _disponible = false;
+      return false;
+    }
   }
 
-  /// Lee [texto] en voz alta. Si ya había una locución en curso, la
-  /// interrumpe y empieza la nueva — esto es deseable para navegación
-  /// porque las instrucciones se actualizan en tiempo real.
+  /// Lee [texto] en voz alta. Si el motor TTS no está disponible, no
+  /// hace nada (sin lanzar). Si ya había una locución en curso, la
+  /// interrumpe — útil para navegación donde las instrucciones se
+  /// actualizan en tiempo real.
   Future<void> hablar(String texto) async {
     if (texto.trim().isEmpty) return;
-    await _asegurarInicializado();
-    await _tts.stop();
-    await _tts.speak(texto);
+    if (!await _asegurarInicializado()) return;
+    try {
+      await _tts.stop();
+      await _tts.speak(texto);
+    } catch (_) {
+      // Algo cambió en runtime (idioma desinstalado, audio focus perdido).
+      // Marcamos como no disponible y dejamos pasar.
+      _disponible = false;
+    }
   }
 
   /// Detiene cualquier locución en curso. Útil cuando el usuario sale
   /// de la pantalla de navegación.
   Future<void> detener() async {
-    await _tts.stop();
+    if (_disponible == false) return;
+    try {
+      await _tts.stop();
+    } catch (_) {
+      // ignore
+    }
   }
 
   void dispose() {

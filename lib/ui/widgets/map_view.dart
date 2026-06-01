@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../models/nodo.dart';
 import '../../models/position.dart';
+import '../theme/app_theme.dart';
 import 'mapa_painter.dart';
 
 /// Widget reutilizable de mapa con comportamiento estilo Google Maps:
@@ -376,13 +377,18 @@ class _MapViewState extends State<MapView>
   Widget _buildTargetIndicator(Size box, Position target) {
     final px = target.x * box.width / widget.mapaSize.width;
     final py = target.y * box.height / widget.mapaSize.height;
+    // Color del tema (respeta modo oscuro). Antes Colors.red.shade400 hardcoded.
+    final color = Theme.of(context)
+            .extension<AppColors>()
+            ?.danger ??
+        Colors.red.shade400;
     return Positioned(
       left: px - 12,
       top: py - 12,
       child: IgnorePointer(
         child: CustomPaint(
           size: const Size(24, 24),
-          painter: _TargetCruzPainter(color: Colors.red.shade400),
+          painter: _TargetCruzPainter(color: color),
         ),
       ),
     );

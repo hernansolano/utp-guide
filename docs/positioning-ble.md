@@ -46,6 +46,28 @@ UTP-Guide usa **`n = 3.5`** por defecto, calibrado para el edificio FISC. Este v
 
 Ver [ADR-0002](adr/0002-parametros-path-loss.md) para la justificación detallada.
 
+#### Limitación: `n` uniforme en todo el piso
+
+El modelo actual asume **un solo `n` global** que aplica por igual a todas las balizas y toda la planta. En la realidad `n` varía por zona:
+
+- **Pasillos amplios** (LOS, pocas obstrucciones): `n` baja, 2.5–3.0
+- **Salones con mobiliario y personas**: `n` sube, 3.0–4.0
+- **Cerca de paredes externas o ductos metálicos**: `n` puede ser >4.0
+- **Esquinas con reflexiones múltiples**: `n` efectivo difícil de modelar (multipath)
+
+Para Fase 1 esta simplificación es aceptable porque:
+1. El piloto es un solo piso del FISC con propagación relativamente uniforme
+2. El `n` se calibra como promedio del comportamiento típico, no para el peor caso
+3. El snap-to-graph corrige errores de hasta 3 m, lo que absorbe parte del sesgo de zona
+
+Si en producción la precisión resulta insuficiente, las opciones de mejora son:
+
+- **Mapa de zonas con `n` distinto**: definir polígonos en el grafo y asignar `n` por zona. Cambio invasivo en el modelo de datos.
+- **Fingerprinting**: levantamiento empírico de RSSI por puntos de grilla, reemplaza el modelo de path-loss por matching con una base de datos. Más preciso pero requiere fase offline de medición (horas).
+- **Filtro de Kalman**: suaviza el estimado entre actualizaciones, no resuelve el sesgo sistemático pero reduce el jitter visible.
+
+Ver [ADR-0002](adr/0002-parametros-path-loss.md) y la propuesta de regresión lineal multi-distancia, que mitigaría este problema parcialmente al permitir un `n` distinto por baliza.
+
 ### El parámetro `txPower`
 
 Es la potencia de señal medida a exactamente 1 metro de la baliza. Cada modelo de baliza tiene un valor distinto:

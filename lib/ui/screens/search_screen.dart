@@ -16,10 +16,17 @@ class SearchScreen extends StatefulWidget {
   /// Se inyecta desde `main.dart`; el toggle vive en SettingsScreen.
   final ValueNotifier<bool> accesibleSoloRutasNotifier;
 
+  /// Filtro inicial preseleccionado al abrir la pantalla. Si es `null`,
+  /// arranca con "Todos". Usado por los quick tiles de HomeScreen para
+  /// llegar directo a la lista filtrada (ej: tap en "Salones" abre
+  /// SearchScreen con `TipoNodo.salon` ya activo).
+  final TipoNodo? tipoFiltroInicial;
+
   const SearchScreen({
     super.key,
     required this.grafoRepository,
     required this.accesibleSoloRutasNotifier,
+    this.tipoFiltroInicial,
   });
 
   @override
@@ -33,6 +40,13 @@ class _SearchScreenState extends State<SearchScreen> {
   TipoNodo? _tipoFiltro;
   bool _soloAccesibles = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _nodosFuture = widget.grafoRepository.obtenerNodos();
+    _tipoFiltro = widget.tipoFiltroInicial;
+  }
+
   static const _chips = [
     _Chip('Todos', null),
     _Chip('Salones', TipoNodo.salon),
@@ -40,12 +54,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _Chip('Oficinas', TipoNodo.oficina),
     _Chip('Ascensores', TipoNodo.ascensor),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _nodosFuture = widget.grafoRepository.obtenerNodos();
-  }
 
   @override
   void dispose() {
@@ -153,7 +161,21 @@ class _SearchScreenState extends State<SearchScreen> {
                         fontWeight: FontWeight.w500,
                         color: colors.fg,
                       ),
-                      decoration: InputDecoration.collapsed(
+                      // No usar InputDecoration.collapsed porque solo
+                      // suprime `border`, no las variantes (enabledBorder,
+                      // focusedBorder, etc.) que se heredan del tema y
+                      // pintan una segunda outline brand sobre el Container.
+                      // Setear todas explícitamente a InputBorder.none.
+                      decoration: InputDecoration(
+                        isCollapsed: true,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
                         hintText: '¿A dónde quieres ir?',
                         hintStyle: GoogleFonts.plusJakartaSans(
                           fontSize: 15,

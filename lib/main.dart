@@ -6,6 +6,7 @@ import 'data/repositories/grafo_repository.dart';
 import 'models/beacon_config.dart';
 import 'models/perfil_movilidad.dart';
 import 'models/position.dart';
+import 'models/tipo_nodo.dart';
 import 'services/ble_service.dart';
 import 'services/ble_source_multiplexer.dart';
 import 'services/positioning_service.dart';
@@ -81,10 +82,17 @@ final _router = GoRouter(
     ),
     GoRoute(
       path: '/search',
-      builder: (_, _) => SearchScreen(
-        grafoRepository: _grafoRepository,
-        accesibleSoloRutasNotifier: accesibleSoloRutasNotifier,
-      ),
+      builder: (_, state) {
+        // Filtro inicial opcional: HomeScreen lo manda desde sus quick
+        // tiles (ej: tap en "Salones" → tipoFiltro = TipoNodo.salon).
+        final extra = state.extra as Map<String, dynamic>?;
+        final tipoFiltro = extra?['tipoFiltro'] as TipoNodo?;
+        return SearchScreen(
+          grafoRepository: _grafoRepository,
+          accesibleSoloRutasNotifier: accesibleSoloRutasNotifier,
+          tipoFiltroInicial: tipoFiltro,
+        );
+      },
     ),
     GoRoute(
       path: '/mapa',
@@ -122,6 +130,7 @@ final _router = GoRouter(
       builder: (_, _) => CalibracionScreen(
         positioningService: _positioningService,
         beaconRepository: _beaconRepository,
+        grafoRepository: _grafoRepository,
         calibracionNotifier: calibracionNotifier,
       ),
     ),

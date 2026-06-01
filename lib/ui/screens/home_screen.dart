@@ -3,10 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../data/repositories/grafo_repository.dart';
+import '../../models/tipo_nodo.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/quick_tile.dart';
 
+/// Pantalla de inicio. Lee metadata del grafo (edificio, piso, SVG)
+/// para que el subtítulo del greeting y el preview del mapa reflejen
+/// la planta modelada, sin valores hardcoded en código.
 class HomeScreen extends StatefulWidget {
   final GrafoRepository grafoRepository;
 
@@ -17,9 +21,33 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String? _edificio;
+  int? _piso;
+  String? _svgPath;
+
   @override
   void initState() {
     super.initState();
+    _cargarMetadataGrafo();
+  }
+
+  Future<void> _cargarMetadataGrafo() async {
+    try {
+      final edificio = await widget.grafoRepository.obtenerEdificio();
+      final piso = await widget.grafoRepository.obtenerPiso();
+      final svg = await widget.grafoRepository.obtenerMapaSvgPath();
+      if (mounted) {
+        setState(() {
+          _edificio = edificio;
+          _piso = piso;
+          _svgPath = svg;
+        });
+      }
+    } catch (_) {
+      // Si falla la carga del grafo, el header sigue mostrando placeholders
+      // — no es bloqueante para que el usuario pueda al menos llegar a
+      // SearchScreen y ver el error real ahí.
+    }
   }
 
   @override
@@ -62,6 +90,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader(BuildContext context, AppColors colors) {
+    final overlineEdificio =
+        _edificio != null ? '$_edificio · UTP' : 'FISC · UTP';
     return Padding(
       padding: EdgeInsets.fromLTRB(
           20, MediaQuery.of(context).padding.top + 16, 20, 12),
@@ -92,7 +122,9 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'FISC · UTP',
+                  overlineEdificio,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -102,6 +134,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Text(
                   'UTP-Guide',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -128,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGreeting(BuildContext context, AppColors colors) {
+    final ubicacion = _ubicacionTexto();
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
       child: Column(
@@ -154,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               children: [
                 TextSpan(
-                  text: 'Edificio FISC · Planta baja',
+                  text: ubicacion,
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.w700,
                     color: colors.fg,
@@ -166,6 +201,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  /// Formato del subtítulo: "Edificio X · Piso N". Mientras el grafo
+  /// no termine de cargar, muestra un placeholder neutral.
+  String _ubicacionTexto() {
+    if (_edificio == null || _piso == null) return 'Cargando ubicación…';
+    return 'Edificio $_edificio · Piso $_piso';
   }
 
   Widget _buildSearchBar(BuildContext context, AppColors colors) {
@@ -200,6 +242,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMapPreview(BuildContext context, AppColors colors) {
+    final floorBadge = _edificio != null && _piso != null
+        ? '$_edificio · Piso $_piso'
+        : 'FISC · PILOTO';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       child: Container(
@@ -213,10 +258,18 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            SvgPicture.asset(
-              'assets/maps/test_room_5x5.svg',
-              fit: BoxFit.cover,
-            ),
+            if (_svgPath != null)
+              SvgPicture.asset(
+                _svgPath!,
+                fit: BoxFit.cover,
+              )
+            else
+              const Center(
+                child: SizedBox(
+                  width: 24, height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
             // Floor label pill
             Positioned(
               left: 12,
@@ -229,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  'FISC · PILOTO',
+                  floorBadge,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -284,6 +337,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Navega a /search con un filtro de tipo pre-aplicado.
+  void _abrirBusquedaConFiltro(TipoNodo? tipo) {
+    context.push('/search', extra: {'tipoFiltro': tipo});
+  }
+
   Widget _buildQuickTiles(BuildContext context, AppColors colors) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
@@ -299,26 +357,26 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.school_outlined,
             label: 'Salones',
             sub: 'Aulas y laboratorios',
-            onTap: () => context.push('/search'),
+            onTap: () => _abrirBusquedaConFiltro(TipoNodo.salon),
           ),
           QuickTile(
             icon: Icons.business_outlined,
             label: 'Oficinas',
             sub: 'Decanato, admisión',
-            onTap: () => context.push('/search'),
+            onTap: () => _abrirBusquedaConFiltro(TipoNodo.oficina),
           ),
           QuickTile(
             icon: Icons.wc_outlined,
             label: 'Servicios',
             sub: 'Cada piso',
-            onTap: () => context.push('/search'),
+            onTap: () => _abrirBusquedaConFiltro(TipoNodo.bano),
           ),
           QuickTile(
             icon: Icons.door_front_door_outlined,
             label: 'Salidas',
-            sub: 'Emergencia',
+            sub: 'Entradas y emergencia',
             tone: TileTone.danger,
-            onTap: () => context.push('/search'),
+            onTap: () => _abrirBusquedaConFiltro(TipoNodo.entrada),
           ),
         ],
       ),
@@ -326,15 +384,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onTabChanged(String tab) {
+    // El tab 'map' desde Home no abre el mapa directo (porque requiere
+    // un destino); abre el buscador para que el usuario elija primero.
     switch (tab) {
-      case 'search':
+      case 'search' || 'map':
         context.push('/search');
       case 'settings':
         context.push('/settings');
-      case 'map':
-        context.push('/search');
-      default:
-        break;
     }
   }
 }

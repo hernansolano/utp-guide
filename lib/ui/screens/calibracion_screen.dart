@@ -5,12 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/beacon_repository.dart';
+import '../../data/repositories/grafo_repository.dart';
 import '../../models/beacon_config.dart';
 import '../../models/beacon_reading.dart';
 import '../../models/beacon_stats.dart';
+import '../../models/position.dart';
 import '../../services/ble_service.dart' show BleEstado;
 import '../../services/positioning_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/map_view.dart';
 
 /// Pantalla de calibración en campo (solo visible en debug builds).
 ///
@@ -33,12 +36,14 @@ import '../theme/app_theme.dart';
 class CalibracionScreen extends StatefulWidget {
   final PositioningService positioningService;
   final BeaconRepository beaconRepository;
+  final GrafoRepository grafoRepository;
   final ValueNotifier<CalibracionPositioning> calibracionNotifier;
 
   const CalibracionScreen({
     super.key,
     required this.positioningService,
     required this.beaconRepository,
+    required this.grafoRepository,
     required this.calibracionNotifier,
   });
 
@@ -62,10 +67,26 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
 
   StreamSubscription<BeaconReading>? _readingsSub;
   StreamSubscription<BleEstado>? _estadoSub;
+  StreamSubscription<Position?>? _posSub;
 
   /// Inputs de la herramienta "Distancia conocida".
   int? _minorSeleccionado;
   final _distanciaController = TextEditingController(text: '1.0');
+
+  // ─── Validación end-to-end (A1) ────────────────────────────────────────────
+
+  /// Posición real marcada por el usuario tocando el mini-mapa.
+  Position? _posicionReal;
+
+  /// Última posición calculada por el PositioningService.
+  Position? _posicionCalculada;
+
+  /// Errores de posición acumulados mientras [_posicionReal] esté marcada.
+  final ErrorPosicionStats _errorStats = ErrorPosicionStats();
+
+  /// Dimensiones y SVG del piso, para el mini-mapa de validación.
+  Size? _dimensionesMapa;
+  String? _svgPath;
 
   @override
   void initState() {
@@ -75,6 +96,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     _cargarConfigs();
     widget.positioningService.iniciar();
     _readingsSub = widget.positioningService.beaconStreamRaw.listen(_onReading);
+    _posSub = widget.positioningService.posicionStream.listen(_onPosicion);
     _estadoSub = widget.positioningService.estadoBleStream.listen((e) {
       if (mounted) setState(() => _bleEstado = e);
     });
@@ -96,7 +118,44 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
         // ignore
       }
     }
-    if (mounted) setState(() {});
+    // Cargar mapa para la sección de validación end-to-end.
+    final dims = await widget.grafoRepository.obtenerDimensionesMapa();
+    final svg = await widget.grafoRepository.obtenerMapaSvgPath();
+    if (mounted) {
+      setState(() {
+        _dimensionesMapa = Size(dims.anchoMetros, dims.altoMetros);
+        _svgPath = svg;
+      });
+    }
+  }
+
+  /// Cada nueva posición calculada: si hay una posición real marcada,
+  /// acumular el error (distancia euclidiana entre ambas).
+  void _onPosicion(Position? pos) {
+    if (!mounted) return;
+    setState(() {
+      _posicionCalculada = pos;
+      if (_posicionReal != null && pos != null) {
+        final error = sqrt(
+          pow(pos.x - _posicionReal!.x, 2) + pow(pos.y - _posicionReal!.y, 2),
+        );
+        _errorStats.agregar(error);
+      }
+    });
+  }
+
+  /// El usuario tocó el mini-mapa: ahí está parado realmente. Reseteamos
+  /// los errores acumulados para empezar a medir desde esta posición.
+  void _onTapPosicionReal(Offset metros) {
+    setState(() {
+      _posicionReal = Position(
+        x: metros.dx,
+        y: metros.dy,
+        piso: 1,
+        timestamp: DateTime.now(),
+      );
+      _errorStats.reset();
+    });
   }
 
   void _onCalibracionCambio() {
@@ -121,6 +180,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     widget.calibracionNotifier.removeListener(_onCalibracionCambio);
     _readingsSub?.cancel();
     _estadoSub?.cancel();
+    _posSub?.cancel();
     _distanciaController.dispose();
     widget.positioningService.detener();
     super.dispose();
@@ -239,6 +299,8 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                 children: [
                   _buildAvisoEstadoBle(context, colors),
                   const SizedBox(height: 16),
+                  _buildSeccionValidacionPosicion(context, colors),
+                  const SizedBox(height: 16),
                   _buildSeccionBalizas(context, colors),
                   const SizedBox(height: 16),
                   _buildSeccionDistanciaConocida(context, colors),
@@ -356,6 +418,111 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeccionValidacionPosicion(BuildContext context, AppColors colors) {
+    final mapaSize = _dimensionesMapa;
+    final svg = _svgPath;
+
+    return _Card(
+      title: 'Validación de posición',
+      subtitle:
+          'Tocá el mapa donde estás parado de verdad. La app compara contra '
+          'su posición calculada y mide el error real en metros.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Mini-mapa interactivo
+          if (mapaSize == null)
+            const SizedBox(
+              height: 240,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 240,
+                color: colors.bgMuted,
+                child: MapView(
+                  mapaSize: mapaSize,
+                  svgAsset: svg,
+                  posicionUsuario: _posicionCalculada, // dot azul
+                  posicionTarget: _posicionReal, // cruz roja
+                  panZoomHabilitado: false,
+                  onTapMundo: _onTapPosicionReal,
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+
+          if (_posicionReal == null)
+            Text(
+              'Tocá tu posición real en el mapa para empezar a medir.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: colors.fgMuted,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else ...[
+            _ResultadoCalcRow(
+              label: 'Pos. real',
+              valor: '(${_posicionReal!.x.toStringAsFixed(2)}, '
+                  '${_posicionReal!.y.toStringAsFixed(2)}) m',
+            ),
+            _ResultadoCalcRow(
+              label: 'App calcula',
+              valor: _posicionCalculada == null
+                  ? 'sin señal'
+                  : '(${_posicionCalculada!.x.toStringAsFixed(2)}, '
+                      '${_posicionCalculada!.y.toStringAsFixed(2)}) m',
+            ),
+            if (_errorStats.tieneMuestras) ...[
+              _ResultadoCalcRow(
+                label: 'Error actual',
+                valor: '${_errorStats.errorActual.toStringAsFixed(2)} m',
+                colorValor: _errorStats.errorActual > 2.0
+                    ? colors.danger
+                    : (_errorStats.errorActual > 1.0
+                        ? Colors.orange.shade700
+                        : colors.success),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Sobre ${_errorStats.samples} muestras (mantené la posición):',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: colors.fgSoft,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _ResultadoCalcRow(
+                label: 'Error medio',
+                valor: '${_errorStats.errorMedio.toStringAsFixed(2)} m',
+              ),
+              _ResultadoCalcRow(
+                label: 'Error máx',
+                valor: '${_errorStats.errorMaximo.toStringAsFixed(2)} m',
+              ),
+              _ResultadoCalcRow(
+                label: 'p95',
+                valor: '${_errorStats.errorP95.toStringAsFixed(2)} m',
+                detalle: '95% del tiempo el error es menor a esto',
+              ),
+            ] else
+              Text(
+                'Esperando posición calculada…',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: colors.fgMuted,
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -614,16 +781,37 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                 'Distancia máxima al grafo para pegar la posición a un pasillo',
           ),
           const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _restaurarValoresOriginales,
-              icon: const Icon(Icons.undo_rounded, size: 16),
-              label: Text(
-                'Restaurar valores del JSON',
-                style: GoogleFonts.plusJakartaSans(fontSize: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // A3: aplicar cambios de slider instantáneamente limpiando
+              // las ventanas de media móvil (que aún tienen valores
+              // calculados con la calibración anterior).
+              TextButton.icon(
+                onPressed: () {
+                  widget.positioningService.resetearVentanas();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Ventanas limpiadas — efecto inmediato'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.bolt_rounded, size: 16),
+                label: Text(
+                  'Limpiar ventana',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12),
+                ),
               ),
-            ),
+              TextButton.icon(
+                onPressed: _restaurarValoresOriginales,
+                icon: const Icon(Icons.undo_rounded, size: 16),
+                label: Text(
+                  'Restaurar JSON',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -809,14 +997,15 @@ class _FilaBeacon extends StatelessWidget {
                 )
               else
                 Text(
-                  'RSSI ${stats.rssiActual.toStringAsFixed(0)} dBm   ·   '
-                  'media ${stats.rssiMean.toStringAsFixed(1)} '
-                  '(σ ${stats.rssiStdDev.toStringAsFixed(1)})   ·   '
+                  'RSSI ${stats.rssiActual.toStringAsFixed(0)} dBm\n'
+                  'media ${stats.rssiMean.toStringAsFixed(1)}  ·  '
+                  'mediana ${stats.rssiMediana.toStringAsFixed(1)}  ·  '
+                  'σ ${stats.rssiStdDev.toStringAsFixed(1)}\n'
                   'd ≈ ${stats.distanciaMean.toStringAsFixed(2)} m',
                   style: const TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
-                    height: 1.4,
+                    height: 1.5,
                   ),
                 ),
             ],

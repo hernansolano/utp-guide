@@ -15,11 +15,11 @@ dependencies:
   go_router: ^13.0.0
   sensors_plus: ^4.0.2
   google_fonts: ^6.2.1
-  flutter_blue_plus: ^1.31.0
-  permission_handler: ^11.3.0
-  # Versión pineada exacta tras auditoría de seguridad (ver
-  # docs/adr/0009-pinning-dependencias.md). No subir sin revisar
-  # changelog y rehacer auditoría.
+  # Versiones pineadas exactas tras auditoría de seguridad (ADR-0009):
+  # paquetes con código nativo y permisos de sistema. No subir sin
+  # revisar changelog y rehacer auditoría.
+  flutter_blue_plus: 1.36.8
+  permission_handler: 11.4.0
   flutter_tts: 4.2.5
 
 dev_dependencies:

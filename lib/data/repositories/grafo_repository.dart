@@ -141,4 +141,28 @@ class GrafoRepository {
       (data['mapa_alto_metros'] as num?)?.toDouble() ?? 5.0,
     );
   }
+
+  /// Código del edificio modelado, según `edificio` en el JSON. Default
+  /// "FISC" si no está definido.
+  Future<String> obtenerEdificio() async {
+    final data = await _load();
+    return data['edificio'] as String? ?? 'FISC';
+  }
+
+  /// Número del piso modelado, según `piso` en el JSON. Default 1.
+  Future<int> obtenerPiso() async {
+    final data = await _load();
+    return data['piso'] as int? ?? 1;
+  }
+
+  /// Ruta del SVG del piso, leída del campo `mapa_svg` del JSON. Si falta,
+  /// usa el SVG de prueba como fallback.
+  ///
+  /// Que viva en el grafo (y no hardcodeada en las pantallas) permite que
+  /// cada piso declare su propio SVG sin tocar código. Ver formato en
+  /// `docs/grafo-format.md`.
+  Future<String> obtenerMapaSvgPath() async {
+    final data = await _load();
+    return data['mapa_svg'] as String? ?? 'assets/maps/test_room_5x5.svg';
+  }
 }

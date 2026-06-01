@@ -75,6 +75,10 @@ class _MapaScreenState extends State<MapaScreen> {
   // Dimensiones del piso (null hasta cargar el grafo).
   Size? _mapaSize;
 
+  /// Path del SVG del piso, leído de `grafo.json → mapa_svg`. Null hasta
+  /// que termine la carga inicial.
+  String? _svgPath;
+
   // Posición BLE del usuario (null = sin señal).
   Position? _posicionUsuario;
   int _beaconsActivos = 0;
@@ -117,10 +121,12 @@ class _MapaScreenState extends State<MapaScreen> {
   Future<void> _cargarRutaYDimensiones() async {
     try {
       final futureDims = widget.grafoRepository.obtenerDimensionesMapa();
+      final futureSvg = widget.grafoRepository.obtenerMapaSvgPath();
       final futureEntradas =
           widget.routingService.nodosPorTipo(TipoNodo.entrada);
 
       final dims = await futureDims;
+      final svgPath = await futureSvg;
       final entradas = await futureEntradas;
       if (entradas.isEmpty) throw Exception('Sin nodo de entrada');
 
@@ -133,6 +139,7 @@ class _MapaScreenState extends State<MapaScreen> {
       if (mounted) {
         setState(() {
           _mapaSize = Size(dims.anchoMetros, dims.altoMetros);
+          _svgPath = svgPath;
           _ruta = ruta;
           _pasos = PasoNavegacion.generarDesdeRuta(ruta);
           _pasoActualIndice = 0;
@@ -512,7 +519,7 @@ class _MapaScreenState extends State<MapaScreen> {
                         builder: (_, posVirtual, _) {
                           return MapView(
                             mapaSize: mapaSize,
-                            svgAsset: 'assets/maps/test_room_5x5.svg',
+                            svgAsset: _svgPath,
                             ruta: _ruta,
                             posicionUsuario: _posicionUsuario,
                             posicionTarget: simulando ? posVirtual : null,
