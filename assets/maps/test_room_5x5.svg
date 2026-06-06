@@ -1,150 +1,157 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  Cuarto de prueba 5 × 5 m — UTP-Guide piloto
 
-  <!-- Metadatos del mapa para la app -->
-  <!-- mapa_ancho_metros: 5.0 -->
-  <!-- mapa_alto_metros: 5.0 -->
-  <!-- escala: 100px = 1 metro -->
-  <!-- origen: esquina superior izquierda (0,0) -->
+  Plano arquitectónico simplificado para validar el sistema BLE
+  (calibración, trilateración, snap-to-graph y navegación A*).
 
-  <!-- Fondo del cuarto -->
-  <rect x="0" y="0" width="500" height="500" fill="#F5F5F0"/>
+  Escala     : 100 px = 1 m (ADR-0006)
+  ViewBox    : 0 0 500 500  (5.00 m × 5.00 m)
+  Origen     : esquina superior izquierda, Y positiva hacia abajo
+  Paredes    : 15 cm de espesor (concreto típico interior)
+  Puerta P-01: pared sur, 1.00 m de ancho, sin arco de apertura
 
-  <!-- Paredes (borde exterior) -->
-  <rect x="10" y="10" width="480" height="480"
-        fill="none" stroke="#2C2C2A" stroke-width="8" rx="4"/>
+  Balizas (montadas en pared, antena hacia el interior del cuarto):
+    B-01 — Minor 1 — (0.5, 0.0) m — pared norte, 0.5 m al este del NO
+    B-02 — Minor 2 — (4.5, 0.0) m — pared norte, 0.5 m al oeste del NE
+    B-03 — Minor 3 — (2.5, 5.0) m — pared sur, centrado
+    Altura de montaje: 2.50 m sobre el piso (sobre marco de puertas).
 
-  <!-- Puerta de entrada (sur, centrada) - apertura de 1m = 100px -->
-  <!-- La puerta va de x=200 a x=300 en y=490 -->
-  <line x1="200" y1="490" x2="300" y2="490"
-        stroke="#F5F5F0" stroke-width="10"/>
-  <!-- Arco de apertura de puerta -->
-  <path d="M200 490 Q200 410 300 490"
-        fill="none" stroke="#2C2C2A" stroke-width="1.5"
-        stroke-dasharray="4 3"/>
-  <!-- Indicador de puerta -->
-  <line x1="200" y1="490" x2="300" y2="490"
-        stroke="#888780" stroke-width="2"/>
+  Nota sobre el modelo de path-loss (ver docs/positioning-ble.md):
+    El modelo es 2D. La altura del beacon (2.5 m) vs altura del teléfono
+    (~1.5 m) introduce un sesgo sistemático en distancias cortas.
+    Despreciable para distancias horizontales > 2 m.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 500 500"
+     width="500"
+     height="500">
 
-  <!-- Grid de referencia métrico (líneas cada 1 metro = 100px) -->
-  <!-- Líneas verticales -->
-  <line x1="110" y1="10" x2="110" y2="490"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
-  <line x1="210" y1="10" x2="210" y2="490"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
-  <line x1="310" y1="10" x2="310" y2="490"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
-  <line x1="410" y1="10" x2="410" y2="490"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
-  <!-- Líneas horizontales -->
-  <line x1="10" y1="110" x2="490" y2="110"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
-  <line x1="10" y1="210" x2="490" y2="210"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
-  <line x1="10" y1="310" x2="490" y2="310"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
-  <line x1="10" y1="410" x2="490" y2="410"
-        stroke="#CCCCCC" stroke-width="0.5" stroke-dasharray="3 4"/>
+  <!-- ────────────────────────────────────────────────────────────
+       Capa 1 — Piso (fondo)
+       ──────────────────────────────────────────────────────────── -->
+  <rect x="0" y="0" width="500" height="500" fill="#F8F7F2"/>
 
-  <!-- Etiquetas métricas (ejes) -->
-  <!-- Eje X (metros horizontales) -->
-  <text x="60"  y="508" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">0m</text>
-  <text x="160" y="508" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">1m</text>
-  <text x="260" y="508" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">2m</text>
-  <text x="360" y="508" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">3m</text>
-  <text x="460" y="508" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">4m</text>
+  <!-- ────────────────────────────────────────────────────────────
+       Capa 2 — Grid de referencia métrica (cada 1 m)
+       ──────────────────────────────────────────────────────────── -->
+  <g id="grid" stroke="#C9C6BC" stroke-width="0.5"
+     stroke-dasharray="2 4" opacity="0.55">
+    <line x1="100" y1="15"  x2="100" y2="485"/>
+    <line x1="200" y1="15"  x2="200" y2="485"/>
+    <line x1="300" y1="15"  x2="300" y2="485"/>
+    <line x1="400" y1="15"  x2="400" y2="485"/>
+    <line x1="15"  y1="100" x2="485" y2="100"/>
+    <line x1="15"  y1="200" x2="485" y2="200"/>
+    <line x1="15"  y1="300" x2="485" y2="300"/>
+    <line x1="15"  y1="400" x2="485" y2="400"/>
+  </g>
 
-  <!-- Eje Y (metros verticales) -->
-  <text x="5" y="65"  font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">0</text>
-  <text x="5" y="165" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">1</text>
-  <text x="5" y="265" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">2</text>
-  <text x="5" y="365" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">3</text>
-  <text x="5" y="465" font-size="11" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">4</text>
+  <!-- ────────────────────────────────────────────────────────────
+       Capa 3 — Paredes (15 px = 15 cm)
+       ──────────────────────────────────────────────────────────── -->
+  <g id="walls" fill="#26261F">
+    <!-- Pared norte -->
+    <rect x="0"   y="0"   width="500" height="15"/>
+    <!-- Pared sur (con apertura para P-01 en x=200..300) -->
+    <rect x="0"   y="485" width="200" height="15"/>
+    <rect x="300" y="485" width="200" height="15"/>
+    <!-- Pared oeste -->
+    <rect x="0"   y="15"  width="15"  height="470"/>
+    <!-- Pared este -->
+    <rect x="485" y="15"  width="15"  height="470"/>
+  </g>
 
-  <!-- Nodos de navegación (posiciones del grafo.json de prueba) -->
-  <!-- N1: Entrada (2.5, 4.5) → px (260, 460) -->
-  <circle id="node-entrada" cx="260" cy="460" r="6"
-          fill="#1D9E75" stroke="white" stroke-width="2"/>
-  <text x="280" y="464" font-size="10" fill="#1D9E75"
-        font-family="sans-serif" font-weight="500">Entrada</text>
+  <!-- ────────────────────────────────────────────────────────────
+       Capa 4 — Dimensiones (estilo arquitectónico)
+       ──────────────────────────────────────────────────────────── -->
+  <g id="dimensions" stroke="#3A3A36" stroke-width="0.6" fill="#222"
+     font-family="Arial, Helvetica, sans-serif" font-size="11"
+     font-weight="600">
 
-  <!-- N2: Centro (2.5, 2.5) → px (260, 260) -->
-  <circle id="node-centro" cx="260" cy="260" r="6"
-          fill="#1D9E75" stroke="white" stroke-width="2"/>
-  <text x="270" y="255" font-size="10" fill="#1D9E75"
-        font-family="sans-serif" font-weight="500">Centro</text>
+    <!-- ── Dimensión horizontal "5.00 m" (al norte, justo bajo pared) ── -->
+    <line x1="15"  y1="15" x2="15"  y2="40"/>
+    <line x1="485" y1="15" x2="485" y2="40"/>
+    <line x1="15"  y1="32" x2="485" y2="32"/>
+    <line x1="11"  y1="28" x2="19"  y2="36"/>
+    <line x1="481" y1="28" x2="489" y2="36"/>
+    <rect x="222" y="25" width="56" height="14" fill="#F8F7F2" stroke="none"/>
+    <text x="250" y="35" text-anchor="middle" stroke="none">5.00 m</text>
 
-  <!-- N3: Esquina NO (0.5, 0.5) → px (60, 60) -->
-  <circle id="node-esquina-no" cx="60" cy="60" r="6"
-          fill="#1D9E75" stroke="white" stroke-width="2"/>
-  <text x="72" y="64" font-size="10" fill="#1D9E75"
-        font-family="sans-serif" font-weight="500">Esq. NO</text>
+    <!-- ── Dimensión vertical "5.00 m" (al este) ── -->
+    <line x1="485" y1="15"  x2="460" y2="15"/>
+    <line x1="485" y1="485" x2="460" y2="485"/>
+    <line x1="468" y1="15"  x2="468" y2="485"/>
+    <line x1="464" y1="11"  x2="472" y2="19"/>
+    <line x1="464" y1="481" x2="472" y2="489"/>
+    <rect x="458" y="222" width="20" height="56" fill="#F8F7F2" stroke="none"/>
+    <text x="468" y="252" text-anchor="middle" stroke="none"
+          transform="rotate(-90, 468, 252)">5.00 m</text>
+  </g>
 
-  <!-- N4: Esquina NE (4.5, 0.5) → px (460, 60) -->
-  <circle id="node-esquina-ne" cx="460" cy="60" r="6"
-          fill="#1D9E75" stroke="white" stroke-width="2"/>
-  <text x="400" y="55" font-size="10" fill="#1D9E75"
-        font-family="sans-serif" font-weight="500">Esq. NE</text>
+  <!-- ────────────────────────────────────────────────────────────
+       Capa 5 — Puerta P-01 (sin arco de apertura)
+       ──────────────────────────────────────────────────────────── -->
+  <g id="door">
+    <!-- Jambas en los bordes de la apertura -->
+    <line x1="200" y1="481" x2="200" y2="492" stroke="#26261F" stroke-width="2"/>
+    <line x1="300" y1="481" x2="300" y2="492" stroke="#26261F" stroke-width="2"/>
+  </g>
 
-  <!-- N5: Esquina SO (0.5, 4.5) → px (60, 460) -->
-  <circle id="node-esquina-so" cx="60" cy="460" r="6"
-          fill="#1D9E75" stroke="white" stroke-width="2"/>
-  <text x="72" y="464" font-size="10" fill="#1D9E75"
-        font-family="sans-serif" font-weight="500">Esq. SO</text>
+  <!-- ────────────────────────────────────────────────────────────
+       Capa 6 — Balizas BLE
+       Convención visual:
+         - Dispositivo: rectángulo pequeño teal, pegado al borde interior
+           de la pared (representa el cuerpo del beacon Minew E2 Max).
+         - Ondas: dos arcos cortos saliendo hacia el interior del cuarto.
+         - Etiqueta: código (B-XX) + altura de montaje (h 2.50 m).
+       ──────────────────────────────────────────────────────────── -->
+  <g id="beacons" font-family="Arial, Helvetica, sans-serif">
 
-  <!-- N6: Esquina SE (4.5, 4.5) → px (460, 460) -->
-  <circle id="node-esquina-se" cx="460" cy="460" r="6"
-          fill="#1D9E75" stroke="white" stroke-width="2"/>
-  <text x="390" y="474" font-size="10" fill="#1D9E75"
-        font-family="sans-serif" font-weight="500">Esq. SE</text>
+    <!-- ── B-01 · Minor 1 · pared NORTE · (0.5, 0.0) m → (50, 0) px ── -->
+    <g transform="translate(50, 0)">
+      <!-- Dispositivo pegado a pared norte (interior del cuarto) -->
+      <rect x="-4" y="15" width="8" height="5" rx="1" fill="#1B5470"/>
+      <!-- Ondas (transmisión hacia el sur, dentro del cuarto) -->
+      <path d="M -7 27 A 7 7 0 0 0 7 27" stroke="#1B5470" stroke-width="1.2" fill="none"/>
+      <path d="M -4 25 A 4 4 0 0 0 4 25" stroke="#1B5470" stroke-width="1.2" fill="none"/>
+      <!-- Etiqueta debajo -->
+      <rect x="-19" y="32" width="38" height="22" rx="2"
+            fill="#F8F7F2" opacity="0.92" stroke="#1B5470" stroke-width="0.4"/>
+      <text x="0" y="43" font-size="9" font-weight="700"
+            fill="#1B5470" text-anchor="middle">B-01</text>
+      <text x="0" y="51" font-size="7" font-weight="500"
+            fill="#666" text-anchor="middle">h 2.50 m</text>
+    </g>
 
-  <!-- Aristas del grafo (conexiones entre nodos) -->
-  <line x1="260" y1="460" x2="260" y2="260"
-        stroke="#1D9E75" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
-  <line x1="260" y1="260" x2="60"  y2="60"
-        stroke="#1D9E75" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
-  <line x1="260" y1="260" x2="460" y2="60"
-        stroke="#1D9E75" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
-  <line x1="260" y1="260" x2="60"  y2="460"
-        stroke="#1D9E75" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
-  <line x1="260" y1="260" x2="460" y2="460"
-        stroke="#1D9E75" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
+    <!-- ── B-02 · Minor 2 · pared NORTE · (4.5, 0.0) m → (450, 0) px ── -->
+    <g transform="translate(450, 0)">
+      <rect x="-4" y="15" width="8" height="5" rx="1" fill="#1B5470"/>
+      <path d="M -7 27 A 7 7 0 0 0 7 27" stroke="#1B5470" stroke-width="1.2" fill="none"/>
+      <path d="M -4 25 A 4 4 0 0 0 4 25" stroke="#1B5470" stroke-width="1.2" fill="none"/>
+      <rect x="-19" y="32" width="38" height="22" rx="2"
+            fill="#F8F7F2" opacity="0.92" stroke="#1B5470" stroke-width="0.4"/>
+      <text x="0" y="43" font-size="9" font-weight="700"
+            fill="#1B5470" text-anchor="middle">B-02</text>
+      <text x="0" y="51" font-size="7" font-weight="500"
+            fill="#666" text-anchor="middle">h 2.50 m</text>
+    </g>
 
-  <!-- Posiciones de beacons BLE de prueba (triángulo para trilateración) -->
-  <!-- B1: esquina NO (0.5, 0.5) → px (60, 60) minor=1 -->
-  <rect x="48" y="22" width="24" height="14" rx="3"
-        fill="#185FA5" opacity="0.9"/>
-  <text x="60" y="32" font-size="8" fill="white"
-        text-anchor="middle" font-family="sans-serif">BLE 1</text>
-
-  <!-- B2: esquina NE (4.5, 0.5) → px (460, 60) minor=2 -->
-  <rect x="448" y="22" width="24" height="14" rx="3"
-        fill="#185FA5" opacity="0.9"/>
-  <text x="460" y="32" font-size="8" fill="white"
-        text-anchor="middle" font-family="sans-serif">BLE 2</text>
-
-  <!-- B3: centro sur (2.5, 4.0) → px (260, 410) minor=3 -->
-  <rect x="248" y="395" width="24" height="14" rx="3"
-        fill="#185FA5" opacity="0.9"/>
-  <text x="260" y="405" font-size="8" fill="white"
-        text-anchor="middle" font-family="sans-serif">BLE 3</text>
-
-  <!-- Título y metadata del mapa -->
-  <text x="250" y="530" font-size="12" fill="#444441"
-        text-anchor="middle" font-family="sans-serif"
-        font-weight="500">Cuarto de prueba 5m x 5m</text>
-  <text x="250" y="545" font-size="10" fill="#888780"
-        text-anchor="middle" font-family="sans-serif">
-    escala: 100px/m | nodos: verdes | beacons BLE: azules
-  </text>
+    <!-- ── B-03 · Minor 3 · pared SUR · (2.5, 5.0) m → (250, 500) px ── -->
+    <g transform="translate(250, 500)">
+      <!-- Dispositivo pegado a pared sur (interior del cuarto) -->
+      <rect x="-4" y="-20" width="8" height="5" rx="1" fill="#1B5470"/>
+      <!-- Ondas (transmisión hacia el norte, dentro del cuarto) -->
+      <path d="M -7 -27 A 7 7 0 0 1 7 -27" stroke="#1B5470" stroke-width="1.2" fill="none"/>
+      <path d="M -4 -25 A 4 4 0 0 1 4 -25" stroke="#1B5470" stroke-width="1.2" fill="none"/>
+      <!-- Etiqueta arriba -->
+      <rect x="-19" y="-54" width="38" height="22" rx="2"
+            fill="#F8F7F2" opacity="0.92" stroke="#1B5470" stroke-width="0.4"/>
+      <text x="0" y="-43" font-size="9" font-weight="700"
+            fill="#1B5470" text-anchor="middle">B-03</text>
+      <text x="0" y="-35" font-size="7" font-weight="500"
+            fill="#666" text-anchor="middle">h 2.50 m</text>
+    </g>
+  </g>
 
 </svg>

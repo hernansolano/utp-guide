@@ -11,8 +11,8 @@
     "expiracion_lectura_segundos": 3
   },
   "beacons": [
-    {"minor": 1, "x": 0.5, "y": 0.5, "txPower_dbm": -65, "descripcion": "Beacon esquina NO"},
-    {"minor": 2, "x": 4.5, "y": 0.5, "txPower_dbm": -65, "descripcion": "Beacon esquina NE"},
-    {"minor": 3, "x": 2.5, "y": 4.0, "txPower_dbm": -65, "descripcion": "Beacon centro sur"}
+    {"minor": 1, "x": 0.5, "y": 0.0, "txPower_dbm": -65, "descripcion": "Pared norte · oeste (h 2.50 m)"},
+    {"minor": 2, "x": 4.5, "y": 0.0, "txPower_dbm": -65, "descripcion": "Pared norte · este (h 2.50 m)"},
+    {"minor": 3, "x": 2.5, "y": 5.0, "txPower_dbm": -65, "descripcion": "Pared sur · centro (h 2.50 m)"}
   ]
 }
