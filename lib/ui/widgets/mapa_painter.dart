@@ -23,6 +23,12 @@ class MapaPainter extends CustomPainter {
   /// distintivo. Útil cuando el usuario tocó cerca de un POI.
   final String? poiResaltadoId;
 
+  /// Polilínea de posiciones capturadas por `TrazaService` mientras la
+  /// traza esté activa. Se pinta como línea fina + dots para que el
+  /// dev compare visualmente el trayecto que el sistema marca contra
+  /// el real. Vacía = no se dibuja.
+  final List<Position> traza;
+
   // Paints cacheados como instance vars: antes se creaban dentro de
   // paint() en cada frame (5+ objetos), forzando GC en Android.
   // Como los colores se resuelven en el factory y el painter es nuevo
@@ -71,6 +77,7 @@ class MapaPainter extends CustomPainter {
     this.posicionUsuario,
     this.pois = const [],
     this.poiResaltadoId,
+    this.traza = const [],
   });
 
   factory MapaPainter.fromContext(
@@ -80,6 +87,7 @@ class MapaPainter extends CustomPainter {
     Position? posicionUsuario,
     List<Nodo> pois = const [],
     String? poiResaltadoId,
+    List<Position> traza = const [],
   }) {
     final c = context.colors;
     return MapaPainter(
@@ -91,6 +99,7 @@ class MapaPainter extends CustomPainter {
       posicionUsuario: posicionUsuario,
       pois: pois,
       poiResaltadoId: poiResaltadoId,
+      traza: traza,
     );
   }
 
@@ -146,10 +155,21 @@ class MapaPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (ruta.isEmpty && posicionUsuario == null && pois.isEmpty) return;
+    if (ruta.isEmpty &&
+        posicionUsuario == null &&
+        pois.isEmpty &&
+        traza.isEmpty) {
+      return;
+    }
 
-    // POIs (modo exploración) — se dibujan primero para que la ruta y el
-    // dot del usuario queden encima.
+    // Traza (modo calibración) — se dibuja primero para que quede por
+    // debajo de la ruta y el dot del usuario.
+    if (traza.length >= 2) {
+      _paintTraza(canvas, size);
+    }
+
+    // POIs (modo exploración) — se dibujan después de la traza pero
+    // debajo de la ruta y el dot.
     if (pois.isNotEmpty) {
       _paintPois(canvas, size);
     }
@@ -181,6 +201,41 @@ class MapaPainter extends CustomPainter {
       canvas.drawCircle(pu, 11.0, _paintAuraUsuario);
       canvas.drawCircle(pu, 7.0, _paintUsuario);
       canvas.drawCircle(pu, 4.0, _paintCentroUsuario);
+    }
+  }
+
+  /// Dibuja la traza como una polilínea naranja semi-translúcida con
+  /// dots pequeños en cada vértice. El punto más reciente queda en
+  /// 100% opacidad, los anteriores van decreciendo para que se note
+  /// visualmente la "antigüedad" de la captura.
+  void _paintTraza(Canvas canvas, Size size) {
+    const colorTraza = Color(0xFFF59E0B); // ámbar — distinto a la ruta
+    final paintLinea = Paint()
+      ..color = colorTraza
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final paintDot = Paint()
+      ..color = colorTraza
+      ..style = PaintingStyle.fill;
+
+    // Línea continua entre puntos consecutivos.
+    final path = Path();
+    final inicio = _toScreen(traza.first.x, traza.first.y, size);
+    path.moveTo(inicio.dx, inicio.dy);
+    for (int i = 1; i < traza.length; i++) {
+      final p = _toScreen(traza[i].x, traza[i].y, size);
+      path.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(path, paintLinea);
+
+    // Dots de cada vértice, opacidad creciente para que el más
+    // reciente quede más vivo.
+    for (int i = 0; i < traza.length; i++) {
+      final p = _toScreen(traza[i].x, traza[i].y, size);
+      final alpha = 0.35 + 0.65 * (i / (traza.length - 1).clamp(1, 9999));
+      canvas.drawCircle(
+          p, 2.5, paintDot..color = colorTraza.withValues(alpha: alpha));
     }
   }
 
@@ -225,5 +280,6 @@ class MapaPainter extends CustomPainter {
       old.userColor != userColor ||
       old.mapaSize != mapaSize ||
       old.pois != pois ||
-      old.poiResaltadoId != poiResaltadoId;
+      old.poiResaltadoId != poiResaltadoId ||
+      old.traza != traza;
 }

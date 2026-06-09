@@ -14,6 +14,7 @@ import '../../models/tipo_nodo.dart';
 import '../../services/ble_service.dart';
 import '../../services/positioning_service.dart';
 import '../../services/routing_service.dart';
+import '../../services/traza_service.dart';
 import '../../services/tts_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
@@ -36,6 +37,7 @@ class MapaScreen extends StatefulWidget {
   final PositioningService positioningService;
   final GrafoRepository grafoRepository;
   final TtsService ttsService;
+  final TrazaService trazaService;
   final ValueNotifier<bool> arAutomaticoNotifier;
   final ValueNotifier<bool> debugOverlayNotifier;
   final ValueNotifier<bool> modoSimulacionNotifier;
@@ -50,6 +52,7 @@ class MapaScreen extends StatefulWidget {
     required this.positioningService,
     required this.grafoRepository,
     required this.ttsService,
+    required this.trazaService,
     required this.arAutomaticoNotifier,
     required this.debugOverlayNotifier,
     required this.modoSimulacionNotifier,
@@ -533,15 +536,19 @@ class _MapaScreenState extends State<MapaScreen> {
                           return ValueListenableBuilder<Position?>(
                             valueListenable: _posicionUsuarioNotifier,
                             builder: (_, posUsuario, _) {
-                              return MapView(
-                                mapaSize: mapaSize,
-                                svgAsset: _svgPath,
-                                ruta: _ruta,
-                                posicionUsuario: posUsuario,
-                                posicionTarget: simulando ? posVirtual : null,
-                                panZoomHabilitado: !simulando,
-                                onTapMundo: simulando ? _onTapPosicionVirtual : null,
-                                controller: _mapController,
+                              return ValueListenableBuilder<List<Position>>(
+                                valueListenable: widget.trazaService.puntos,
+                                builder: (_, traza, _) => MapView(
+                                  mapaSize: mapaSize,
+                                  svgAsset: _svgPath,
+                                  ruta: _ruta,
+                                  posicionUsuario: posUsuario,
+                                  posicionTarget: simulando ? posVirtual : null,
+                                  traza: traza,
+                                  panZoomHabilitado: !simulando,
+                                  onTapMundo: simulando ? _onTapPosicionVirtual : null,
+                                  controller: _mapController,
+                                ),
                               );
                             },
                           );

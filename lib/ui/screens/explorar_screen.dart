@@ -10,6 +10,7 @@ import '../../models/position.dart';
 import '../../models/tipo_nodo.dart';
 import '../../services/ble_service.dart' show BleEstado;
 import '../../services/positioning_service.dart';
+import '../../services/traza_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/map_view.dart';
@@ -30,6 +31,7 @@ import '../widgets/mapa_painter.dart';
 class ExplorarScreen extends StatefulWidget {
   final GrafoRepository grafoRepository;
   final PositioningService positioningService;
+  final TrazaService trazaService;
   final ValueNotifier<bool> accesibleSoloRutasNotifier;
   final ValueNotifier<bool> modoSimulacionNotifier;
   final ValueNotifier<Position?> posicionVirtualNotifier;
@@ -38,6 +40,7 @@ class ExplorarScreen extends StatefulWidget {
     super.key,
     required this.grafoRepository,
     required this.positioningService,
+    required this.trazaService,
     required this.accesibleSoloRutasNotifier,
     required this.modoSimulacionNotifier,
     required this.posicionVirtualNotifier,
@@ -320,15 +323,19 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                   child: ValueListenableBuilder<Position?>(
                     valueListenable: _posicionUsuarioNotifier,
                     builder: (_, posUsuario, _) {
-                      return MapView(
-                        mapaSize: mapaSize,
-                        svgAsset: _svgPath,
-                        posicionUsuario: posUsuario,
-                        pois: _pois,
-                        poiResaltadoId: poiSel?.id,
-                        panZoomHabilitado: true,
-                        onTapMundo: _onTapMapa,
-                        controller: _mapController,
+                      return ValueListenableBuilder<List<Position>>(
+                        valueListenable: widget.trazaService.puntos,
+                        builder: (_, traza, _) => MapView(
+                          mapaSize: mapaSize,
+                          svgAsset: _svgPath,
+                          posicionUsuario: posUsuario,
+                          pois: _pois,
+                          poiResaltadoId: poiSel?.id,
+                          traza: traza,
+                          panZoomHabilitado: true,
+                          onTapMundo: _onTapMapa,
+                          controller: _mapController,
+                        ),
                       );
                     },
                   ),

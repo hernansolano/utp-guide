@@ -15,6 +15,7 @@ import 'services/ibeacon_core_location_service.dart';
 import 'services/positioning_service.dart';
 import 'services/routing_service.dart';
 import 'services/simulated_ble_service.dart';
+import 'services/traza_service.dart';
 import 'services/tts_service.dart';
 import 'ui/screens/calibracion_screen.dart';
 import 'ui/screens/explorar_screen.dart';
@@ -38,6 +39,17 @@ final vozHabilitadaNotifier         = ValueNotifier<bool>(false);
 final textoGrandeNotifier           = ValueNotifier<bool>(false);
 final arAutomaticoNotifier          = ValueNotifier<bool>(true);
 final debugOverlayNotifier          = ValueNotifier<bool>(kDebugMode);
+
+/// Si false, `PositioningService` no aplica snap-to-graph y emite la
+/// posición cruda del centroide ponderado. Útil para calibrar: ver el
+/// dot saltando "donde el sistema cree" sin que las aristas del grafo
+/// lo enmascaren. Default true (snap activo, comportamiento normal).
+final snapHabilitadoNotifier        = ValueNotifier<bool>(true);
+
+/// Cuando true, [TrazaService] acumula cada posición emitida en una
+/// polilínea visible sobre el mapa. Útil para ver el trayecto que el
+/// sistema marca mientras te movés, y compararlo con la realidad.
+final trazaActivaNotifier           = ValueNotifier<bool>(false);
 
 /// Si true, el sistema usa el simulador BLE en lugar del escaneo real.
 final modoSimulacionNotifier        = ValueNotifier<bool>(false);
@@ -83,8 +95,10 @@ final _positioningService = PositioningService(
   _beaconRepository,
   _grafoRepository,
   calibracionNotifier,
+  snapHabilitadoListenable: snapHabilitadoNotifier,
 );
 final _ttsService         = TtsService();
+final _trazaService       = TrazaService(_positioningService, trazaActivaNotifier);
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 final _router = GoRouter(
@@ -118,6 +132,7 @@ final _router = GoRouter(
           positioningService: _positioningService,
           grafoRepository: _grafoRepository,
           ttsService: _ttsService,
+          trazaService: _trazaService,
           arAutomaticoNotifier: arAutomaticoNotifier,
           debugOverlayNotifier: debugOverlayNotifier,
           modoSimulacionNotifier: modoSimulacionNotifier,
@@ -131,6 +146,7 @@ final _router = GoRouter(
       builder: (_, _) => ExplorarScreen(
         grafoRepository: _grafoRepository,
         positioningService: _positioningService,
+        trazaService: _trazaService,
         accesibleSoloRutasNotifier: accesibleSoloRutasNotifier,
         modoSimulacionNotifier: modoSimulacionNotifier,
         posicionVirtualNotifier: posicionVirtualNotifier,
@@ -146,6 +162,8 @@ final _router = GoRouter(
         arAutomaticoNotifier: arAutomaticoNotifier,
         debugOverlayNotifier: debugOverlayNotifier,
         modoSimulacionNotifier: modoSimulacionNotifier,
+        snapHabilitadoNotifier: snapHabilitadoNotifier,
+        trazaActivaNotifier: trazaActivaNotifier,
       ),
     ),
     GoRoute(
@@ -155,6 +173,9 @@ final _router = GoRouter(
         beaconRepository: _beaconRepository,
         grafoRepository: _grafoRepository,
         calibracionNotifier: calibracionNotifier,
+        trazaService: _trazaService,
+        snapHabilitadoNotifier: snapHabilitadoNotifier,
+        trazaActivaNotifier: trazaActivaNotifier,
       ),
     ),
   ],

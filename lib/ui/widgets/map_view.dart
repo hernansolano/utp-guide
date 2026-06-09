@@ -47,6 +47,10 @@ class MapView extends StatefulWidget {
   /// Útil cuando el usuario tocó cerca de un POI específico.
   final String? poiResaltadoId;
 
+  /// Polilínea de posiciones capturadas por [TrazaService]. Si está
+  /// vacía o tiene menos de 2 puntos, no se pinta nada.
+  final List<Position> traza;
+
   /// Si true, se pueden hacer pan/zoom con gestos. En modo simulación
   /// se desactiva para que el gesto del dedo coloque la posición
   /// virtual en lugar de mover la cámara.
@@ -79,6 +83,7 @@ class MapView extends StatefulWidget {
     this.controller,
     this.pois = const [],
     this.poiResaltadoId,
+    this.traza = const [],
   });
 
   @override
@@ -367,6 +372,7 @@ class _MapViewState extends State<MapView>
             posicionUsuario: widget.posicionUsuario,
             pois: widget.pois,
             poiResaltadoId: widget.poiResaltadoId,
+            traza: widget.traza,
           ),
           size: box,
         ),

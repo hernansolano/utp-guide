@@ -14,6 +14,7 @@ import '../../models/beacon_stats.dart';
 import '../../models/position.dart';
 import '../../services/ble_service.dart' show BleEstado;
 import '../../services/positioning_service.dart';
+import '../../services/traza_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/map_view.dart';
 
@@ -40,6 +41,9 @@ class CalibracionScreen extends StatefulWidget {
   final BeaconRepository beaconRepository;
   final GrafoRepository grafoRepository;
   final ValueNotifier<CalibracionPositioning> calibracionNotifier;
+  final TrazaService trazaService;
+  final ValueNotifier<bool> snapHabilitadoNotifier;
+  final ValueNotifier<bool> trazaActivaNotifier;
 
   const CalibracionScreen({
     super.key,
@@ -47,6 +51,9 @@ class CalibracionScreen extends StatefulWidget {
     required this.beaconRepository,
     required this.grafoRepository,
     required this.calibracionNotifier,
+    required this.trazaService,
+    required this.snapHabilitadoNotifier,
+    required this.trazaActivaNotifier,
   });
 
   @override
@@ -446,6 +453,10 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                   // llegan paquetes BLE y de qué formato.
                   _buildSeccionDiagnosticoBle(context, colors),
                   const SizedBox(height: 16),
+                  // Controles de modo crudo + traza para validar la
+                  // calibración visualmente.
+                  _buildSeccionModoCrudo(context, colors),
+                  const SizedBox(height: 16),
                   // Sliders subidos — son la herramienta principal de la
                   // pantalla y antes estaban casi al final del scroll.
                   _buildSeccionSliders(context, colors),
@@ -642,6 +653,79 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     );
   }
 
+  Widget _buildSeccionModoCrudo(BuildContext context, AppColors colors) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        widget.snapHabilitadoNotifier,
+        widget.trazaActivaNotifier,
+        widget.trazaService.puntos,
+      ]),
+      builder: (_, _) {
+        final snapOn = widget.snapHabilitadoNotifier.value;
+        final trazaOn = widget.trazaActivaNotifier.value;
+        final cantidad = widget.trazaService.puntos.value.length;
+
+        return _Card(
+          title: 'Modo crudo & traza',
+          subtitle:
+              'Para comparar el cálculo del sistema con la realidad sin '
+              'que el snap-to-graph maquille los errores.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ToggleRow(
+                titulo: 'Snap-to-graph',
+                detalle: snapOn
+                    ? 'El dot se pega al pasillo más cercano (modo normal).'
+                    : 'El dot muestra la posición cruda del centroide.',
+                value: snapOn,
+                onChanged: (v) => widget.snapHabilitadoNotifier.value = v,
+              ),
+              const SizedBox(height: 10),
+              _ToggleRow(
+                titulo: 'Capturar traza',
+                detalle: trazaOn
+                    ? 'Acumulando posiciones · $cantidad puntos'
+                    : 'OFF — activá para empezar a dibujar el trayecto.',
+                value: trazaOn,
+                onChanged: (v) => widget.trazaActivaNotifier.value = v,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: cantidad == 0
+                          ? null
+                          : () {
+                              widget.trazaService.limpiar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Traza limpiada'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      label: Text(
+                        'Limpiar traza',
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSeccionValidacionPosicion(BuildContext context, AppColors colors) {
     final mapaSize = _dimensionesMapa;
     final svg = _svgPath;
@@ -666,13 +750,17 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
               child: Container(
                 height: 240,
                 color: colors.bgMuted,
-                child: MapView(
-                  mapaSize: mapaSize,
-                  svgAsset: svg,
-                  posicionUsuario: _posicionCalculada, // dot azul
-                  posicionTarget: _posicionReal, // cruz roja
-                  panZoomHabilitado: false,
-                  onTapMundo: _onTapPosicionReal,
+                child: ValueListenableBuilder<List<Position>>(
+                  valueListenable: widget.trazaService.puntos,
+                  builder: (_, traza, _) => MapView(
+                    mapaSize: mapaSize,
+                    svgAsset: svg,
+                    posicionUsuario: _posicionCalculada, // dot azul
+                    posicionTarget: _posicionReal, // cruz roja
+                    traza: traza,
+                    panZoomHabilitado: false,
+                    onTapMundo: _onTapPosicionReal,
+                  ),
                 ),
               ),
             ),
@@ -1391,6 +1479,61 @@ class _FilaAdvertisement extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Fila compacta con título + descripción + switch a la derecha. Usada
+/// en la sección "Modo crudo & traza" para los dos toggles principales.
+class _ToggleRow extends StatelessWidget {
+  final String titulo;
+  final String detalle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _ToggleRow({
+    required this.titulo,
+    required this.detalle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                titulo,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: colors.fg,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                detalle,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  color: colors.fgMuted,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Switch.adaptive(
+          value: value,
+          onChanged: onChanged,
         ),
       ],
     );

@@ -57,6 +57,11 @@ class PositioningService {
   final GrafoRepository _grafoRepo;
   final ValueListenable<CalibracionPositioning> _calibracionListenable;
 
+  /// Listenable opcional para deshabilitar snap-to-graph en runtime.
+  /// Si es null (default), el snap siempre se aplica. Si está conectado
+  /// y emite `false`, las posiciones salen crudas del centroide.
+  final ValueListenable<bool>? _snapHabilitadoListenable;
+
   /// Cache local de la calibración. Se actualiza vía listener del
   /// [_calibracionListenable], permitiendo cambios en runtime sin
   /// reiniciar el servicio.
@@ -155,8 +160,10 @@ class PositioningService {
     this._ble,
     this._beaconRepo,
     this._grafoRepo,
-    this._calibracionListenable,
-  ) : _calibracion = _calibracionListenable.value {
+    this._calibracionListenable, {
+    ValueListenable<bool>? snapHabilitadoListenable,
+  })  : _snapHabilitadoListenable = snapHabilitadoListenable,
+        _calibracion = _calibracionListenable.value {
     _calibracionListenable.addListener(_onCalibracionCambio);
   }
 
@@ -314,6 +321,19 @@ class PositioningService {
   }
 
   Position _snapToGraphSync(double x, double y) {
+    // Cuando el toggle de calibración pide snap off, devolvemos la
+    // posición cruda directamente — útil para que el dev vea dónde
+    // "cae" el centroide ponderado sin la corrección de aristas.
+    if (_snapHabilitadoListenable != null &&
+        !_snapHabilitadoListenable.value) {
+      return Position(
+        x: x,
+        y: y,
+        piso: 1,
+        timestamp: DateTime.now(),
+      );
+    }
+
     double minDist = double.infinity;
     double snapX = x, snapY = y;
 

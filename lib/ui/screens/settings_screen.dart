@@ -21,6 +21,8 @@ class SettingsScreen extends StatelessWidget {
   final ValueNotifier<bool> arAutomaticoNotifier;
   final ValueNotifier<bool> debugOverlayNotifier;
   final ValueNotifier<bool> modoSimulacionNotifier;
+  final ValueNotifier<bool> snapHabilitadoNotifier;
+  final ValueNotifier<bool> trazaActivaNotifier;
 
   const SettingsScreen({
     super.key,
@@ -31,6 +33,8 @@ class SettingsScreen extends StatelessWidget {
     required this.arAutomaticoNotifier,
     required this.debugOverlayNotifier,
     required this.modoSimulacionNotifier,
+    required this.snapHabilitadoNotifier,
+    required this.trazaActivaNotifier,
   });
 
   @override
@@ -54,6 +58,8 @@ class SettingsScreen extends StatelessWidget {
                 arAutomaticoNotifier,
                 debugOverlayNotifier,
                 modoSimulacionNotifier,
+                snapHabilitadoNotifier,
+                trazaActivaNotifier,
               ]),
               builder: (context, _) => ListView(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
@@ -155,6 +161,28 @@ class SettingsScreen extends StatelessWidget {
                           value: debugOverlayNotifier.value,
                           onToggle: () => debugOverlayNotifier.value =
                               !debugOverlayNotifier.value,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.alt_route_rounded,
+                          title: 'Snap-to-graph',
+                          sub: 'Si está OFF, el punto azul muestra la '
+                              'posición cruda del centroide sin pegarse '
+                              'a los pasillos del grafo.',
+                          toggle: true,
+                          value: snapHabilitadoNotifier.value,
+                          onToggle: () => snapHabilitadoNotifier.value =
+                              !snapHabilitadoNotifier.value,
+                        ),
+                        _SettingsRow(
+                          icon: Icons.gesture_rounded,
+                          title: 'Capturar traza',
+                          sub: 'Dibuja una polilínea ámbar con todas las '
+                              'posiciones que el sistema marca mientras '
+                              'esté activo.',
+                          toggle: true,
+                          value: trazaActivaNotifier.value,
+                          onToggle: () => trazaActivaNotifier.value =
+                              !trazaActivaNotifier.value,
                         ),
                         _SettingsRow(
                           icon: Icons.tune_rounded,
