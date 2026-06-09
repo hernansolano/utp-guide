@@ -72,6 +72,11 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
   StreamSubscription<Position?>? _posSub;
   StreamSubscription<AdvertisementCrudo>? _crudoSub;
 
+  /// Si ya se mostró el aviso de "permisos negados" o "BT apagado".
+  /// Se resetea al volver a un estado bueno para que reaparezca si el
+  /// usuario apaga BT después de cerrarlo.
+  bool _avisoBlePendiente = false;
+
   /// Throttling de rebuilds: las lecturas BLE pueden llegar a 6-10 Hz,
   /// pero la UI no necesita rebuilds tan frecuentes. Acumulamos cambios
   /// y hacemos `setState` máximo cada 250 ms (4 Hz visual). Esto reduce
@@ -116,7 +121,15 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     _readingsSub = widget.positioningService.beaconStreamRaw.listen(_onReading);
     _posSub = widget.positioningService.posicionStream.listen(_onPosicion);
     _estadoSub = widget.positioningService.estadoBleStream.listen((e) {
-      if (mounted) setState(() => _bleEstado = e);
+      if (!mounted) return;
+      setState(() {
+        _bleEstado = e;
+        // Si vuelve a estado bueno, permitir que el aviso reaparezca
+        // si después el usuario apaga BT/niega permisos otra vez.
+        if (e == BleEstado.escaneando || e == BleEstado.simulando) {
+          _avisoBlePendiente = false;
+        }
+      });
     });
     _crudoSub = widget.positioningService.advertisementsCrudosStream
         .listen(_onAdvertisementCrudo);
@@ -329,11 +342,94 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     return _stats[_minorSeleccionado];
   }
 
+  // ─── Diálogo BLE (permisos / BT apagado) ──────────────────────────────────
+
+  Future<void> _mostrarDialogoBleSiAplica() async {
+    if (_avisoBlePendiente) return;
+    if (_bleEstado != BleEstado.permisosNegados &&
+        _bleEstado != BleEstado.bluetoothApagado) {
+      return;
+    }
+    _avisoBlePendiente = true;
+    final colors = context.colors;
+    final esPermisos = _bleEstado == BleEstado.permisosNegados;
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: colors.surface,
+        title: Text(
+          esPermisos ? 'Activá los permisos' : 'Activá el Bluetooth',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: colors.fg,
+          ),
+        ),
+        content: Text(
+          esPermisos
+              ? 'La calibración necesita acceso a Bluetooth para recibir '
+                  'lecturas de las balizas. Tocá "Reintentar" para volver '
+                  'a pedirlos, o activalos en Ajustes del sistema → Apps → '
+                  'UTP Guide → Permisos.'
+              : 'El Bluetooth de tu dispositivo está apagado. Activalo '
+                  'desde el panel de control rápido para empezar a recibir '
+                  'lecturas.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            color: colors.fgMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          if (esPermisos)
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final ok =
+                    await widget.positioningService.reintentarPermisosBle();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'Permisos concedidos · escaneando…'
+                        : 'Permisos siguen denegados · revisá Ajustes del sistema'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              },
+              child: Text(
+                'Reintentar',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w600,
+                  color: colors.brand,
+                ),
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Entendido',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                color: colors.fgMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // Mostrar el diálogo si aplica, después del primer frame.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _mostrarDialogoBleSiAplica());
+
     return Scaffold(
       backgroundColor: colors.bgSoft,
       body: SafeArea(
@@ -488,9 +584,39 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
               'revisá Bluetooth y permisos'
           : '${items.length} dispositivos · $aceptados aceptados · '
               '$descartados descartados',
-      child: items.isEmpty
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Botón siempre visible: forzar solicitud de permisos. Útil
+          // cuando el usuario abre la pantalla y nunca le pidió nada
+          // (caso iOS o permisos ya negados antes).
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () async {
+                final ok =
+                    await widget.positioningService.reintentarPermisosBle();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'Permisos OK · escaneando'
+                        : 'Permisos siguen denegados · revisá Ajustes del sistema'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.lock_open_rounded, size: 16),
+              label: Text(
+                'Solicitar permisos',
+                style: GoogleFonts.plusJakartaSans(fontSize: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Center(
                 child: Text(
                   'Esperando advertisements BLE…',
@@ -501,7 +627,8 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                 ),
               ),
             )
-          : Column(
+          else
+            Column(
               children: [
                 for (int i = 0; i < items.length; i++) ...[
                   _FilaAdvertisement(item: items[i]),
@@ -510,6 +637,8 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                 ],
               ],
             ),
+        ],
+      ),
     );
   }
 

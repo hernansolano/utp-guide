@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/advertisement_crudo.dart';
@@ -118,9 +118,16 @@ class BleService implements BleSource {
   Future<void> iniciarEscaneo() async {
     if (_activo) return;
 
+    if (kDebugMode) {
+      debugPrint('[BleService] iniciarEscaneo() — uuid=$_uuidObjetivo');
+    }
+
     // Paso 1 — permisos
     _emitir(BleEstado.solicitandoPermisos);
     final permisosOk = await _solicitarPermisos();
+    if (kDebugMode) {
+      debugPrint('[BleService] permisos OK: $permisosOk');
+    }
     if (!permisosOk) {
       _emitir(BleEstado.permisosNegados);
       return;
@@ -129,7 +136,16 @@ class BleService implements BleSource {
     // Paso 2 — adaptador BT encendido
     final adapter = await FlutterBluePlus.adapterState.first
         .timeout(const Duration(seconds: 2), onTimeout: () => BluetoothAdapterState.unknown);
-    if (adapter != BluetoothAdapterState.on) {
+    if (kDebugMode) {
+      debugPrint('[BleService] adapterState: $adapter');
+    }
+    // En iOS, el primer `startScan` puede disparar el diálogo nativo
+    // de Bluetooth. Si el adaptador todavía aparece como `unauthorized`,
+    // intentamos startScan igual: el SO mostrará el prompt en ese
+    // momento y el adaptador pasará a `on` cuando el usuario apruebe.
+    final adapterListo = adapter == BluetoothAdapterState.on ||
+        (Platform.isIOS && adapter == BluetoothAdapterState.unknown);
+    if (!adapterListo) {
       _emitir(BleEstado.bluetoothApagado);
       return;
     }
@@ -139,6 +155,25 @@ class BleService implements BleSource {
     _scanSub = FlutterBluePlus.scanResults.listen(_procesarResultados);
     _emitir(BleEstado.escaneando);
     await _iniciarCiclo();
+  }
+
+  /// Fuerza una nueva solicitud de permisos sin detener el escaneo.
+  ///
+  /// Útil cuando la primera solicitud falló (porque el usuario tocó
+  /// "Denegar" o porque el SO no mostró el diálogo) y el dev quiere
+  /// reintentar desde un botón en la UI de calibración.
+  @override
+  Future<bool> reintentarPermisos() async {
+    if (kDebugMode) {
+      debugPrint('[BleService] reintentarPermisos()');
+    }
+    final ok = await _solicitarPermisos();
+    if (ok && !_activo) {
+      // Si antes habíamos quedado en "permisosNegados", relanzar el
+      // ciclo completo ahora que sí están concedidos.
+      await iniciarEscaneo();
+    }
+    return ok;
   }
 
   /// Solicita los permisos requeridos según la plataforma y versión.
@@ -161,6 +196,9 @@ class BleService implements BleSource {
           Permission.bluetoothConnect,
           Permission.locationWhenInUse,
         ].request();
+        if (kDebugMode) {
+          debugPrint('[BleService] permisos Android: $resultados');
+        }
 
         // Suficiente con tener scan + connect (en Android 12+) o
         // location (en Android < 12). El paquete maneja esto bien.
@@ -173,13 +211,20 @@ class BleService implements BleSource {
 
         return (scanOk && connectOk) || locationOk;
       } else if (Platform.isIOS) {
-        // iOS pide el permiso automáticamente al primer uso de Bluetooth
-        // siempre que NSBluetoothAlwaysUsageDescription esté en Info.plist.
-        final result = await Permission.bluetooth.request();
-        return result.isGranted || result.isLimited;
+        // iOS NO dispara el diálogo de Bluetooth desde
+        // `Permission.bluetooth.request()` — solo lo dispara cuando el
+        // CBCentralManager intenta iniciar un scan real
+        // (FlutterBluePlus.startScan). Por eso retornamos true acá y
+        // dejamos que el SO muestre el prompt en el paso 3 de
+        // iniciarEscaneo. NSBluetoothAlwaysUsageDescription tiene que
+        // estar declarado en Info.plist (verificado).
+        return true;
       }
       return true; // otras plataformas: asumir OK
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BleService] _solicitarPermisos error: $e');
+      }
       return false;
     }
   }

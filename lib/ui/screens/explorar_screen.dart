@@ -68,6 +68,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
 
   Nodo? _poiSeleccionado;
   BleEstado _bleEstado = BleEstado.inactivo;
+  bool _avisoBlePendiente = false;
 
   // Notifiers para que el dot del usuario y el chip BLE rebuildeen
   // solos sin tocar el resto del Stack (mismo patrón que MapaScreen).
@@ -116,7 +117,13 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
 
   void _iniciarPosicionamiento() {
     _estadoSub = widget.positioningService.estadoBleStream.listen((e) {
-      if (mounted) setState(() => _bleEstado = e);
+      if (!mounted) return;
+      setState(() {
+        _bleEstado = e;
+        if (e == BleEstado.escaneando || e == BleEstado.simulando) {
+          _avisoBlePendiente = false;
+        }
+      });
     });
     _posSub = widget.positioningService.posicionStream.listen((pos) {
       if (!mounted) return;
@@ -183,6 +190,81 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
     return sqrt(dx * dx + dy * dy);
   }
 
+  Future<void> _mostrarDialogoBleSiAplica() async {
+    if (_avisoBlePendiente) return;
+    if (_bleEstado != BleEstado.permisosNegados &&
+        _bleEstado != BleEstado.bluetoothApagado) {
+      return;
+    }
+    _avisoBlePendiente = true;
+    final colors = context.colors;
+    final esPermisos = _bleEstado == BleEstado.permisosNegados;
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: colors.surface,
+        title: Text(
+          esPermisos ? 'Activá los permisos' : 'Activá el Bluetooth',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: colors.fg,
+          ),
+        ),
+        content: Text(
+          esPermisos
+              ? 'UTP-Guide necesita acceso a Bluetooth para calcular tu '
+                  'posición dentro del edificio. Tocá "Reintentar" o '
+                  'activalos en Ajustes del sistema.'
+              : 'El Bluetooth está apagado. Activalo desde el panel de '
+                  'control rápido para ver tu posición en el mapa.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            color: colors.fgMuted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          if (esPermisos)
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final ok =
+                    await widget.positioningService.reintentarPermisosBle();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'Permisos OK · escaneando'
+                        : 'Permisos siguen denegados'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              },
+              child: Text(
+                'Reintentar',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w600,
+                  color: colors.brand,
+                ),
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Entendido',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                color: colors.fgMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _onTapBotonUbicacion() {
     final tienePos = _posicionUsuarioNotifier.value != null;
     if (!tienePos) {
@@ -201,6 +283,8 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _mostrarDialogoBleSiAplica());
 
     if (_cargando) {
       return Scaffold(

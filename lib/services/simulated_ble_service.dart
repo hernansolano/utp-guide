@@ -97,6 +97,11 @@ class SimulatedBleService implements BleSource {
     _emitir(BleEstado.inactivo);
   }
 
+  /// En modo simulado no hay permisos del sistema involucrados — el
+  /// servicio "siempre acepta". Retorna true.
+  @override
+  Future<bool> reintentarPermisos() async => true;
+
   /// Genera y emite una lectura sintética por cada baliza registrada,
   /// basada en la posición virtual actual.
   void _emitirCiclo() {

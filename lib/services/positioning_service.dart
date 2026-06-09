@@ -126,6 +126,11 @@ class PositioningService {
   /// Estado actual del escaneo BLE.
   BleEstado get estadoBleActual => _ble.estadoActual;
 
+  /// Reintenta la solicitud de permisos del BleSource activo. Útil
+  /// cuando la primera solicitud falló (estado `permisosNegados`) y la
+  /// UI quiere ofrecer un botón de reintento.
+  Future<bool> reintentarPermisosBle() => _ble.reintentarPermisos();
+
   // ─── API de debug ────────────────────────────────────────────────────────
 
   /// Última posición calculada antes del snap-to-graph.

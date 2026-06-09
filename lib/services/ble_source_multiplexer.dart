@@ -69,6 +69,11 @@ class BleSourceMultiplexer implements BleSource {
     await _fuenteActiva.iniciarEscaneo();
   }
 
+  /// Delega en la fuente activa. Si ya estábamos escaneando real y
+  /// los permisos se otorgaron, no hace nada extra.
+  @override
+  Future<bool> reintentarPermisos() => _fuenteActiva.reintentarPermisos();
+
   @override
   Future<void> detenerEscaneo() async {
     if (!_activo) return;

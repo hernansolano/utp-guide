@@ -38,6 +38,12 @@ abstract interface class BleSource {
   /// permisos del sistema o inicialización de Bluetooth.
   Future<void> iniciarEscaneo();
 
+  /// Fuerza una nueva solicitud de permisos. Útil cuando el primer
+  /// intento falló (estado `permisosNegados`) y el usuario quiere
+  /// reintentar manualmente desde la UI. Retorna `true` si los
+  /// permisos quedan concedidos.
+  Future<bool> reintentarPermisos();
+
   /// Detiene la emisión y libera recursos.
   Future<void> detenerEscaneo();
 
