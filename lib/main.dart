@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +9,9 @@ import 'models/perfil_movilidad.dart';
 import 'models/position.dart';
 import 'models/tipo_nodo.dart';
 import 'services/ble_service.dart';
+import 'services/ble_source.dart';
 import 'services/ble_source_multiplexer.dart';
+import 'services/ibeacon_core_location_service.dart';
 import 'services/positioning_service.dart';
 import 'services/routing_service.dart';
 import 'services/simulated_ble_service.dart';
@@ -54,7 +57,16 @@ final calibracionNotifier =
 
 // ─── Servicios de posicionamiento ────────────────────────────────────────────
 
-final _bleServiceReal     = BleService();
+/// Fuente real de iBeacons. Elegida según plataforma:
+/// - **iOS** → [IbeaconCoreLocationService] (Core Location). Apple
+///   bloquea iBeacons en Core Bluetooth; flutter_blue_plus no los ve
+///   en iPhone. Core Location es la única vía soportada.
+/// - **Android** → [BleService] (flutter_blue_plus). Detecta iBeacons
+///   sin problemas y nos da el stream crudo de advertisements para el
+///   diagnóstico de la pantalla de calibración.
+final BleSource _bleServiceReal = Platform.isIOS
+    ? IbeaconCoreLocationService()
+    : BleService();
 final _bleServiceSimulado = SimulatedBleService(
   _beaconRepository,
   posicionVirtualNotifier,
@@ -157,7 +169,9 @@ Future<void> main() async {
   try {
     calibracionNotifier.value = await _beaconRepository.obtenerCalibracion();
     final uuid = await _beaconRepository.obtenerUuid();
-    _bleServiceReal.configurarUuidObjetivo(uuid);
+    // El multiplexer propaga al real (BleService o IbeaconCoreLocation)
+    // y al simulado (no-op). No requiere cast por plataforma.
+    _bleSource.configurarUuidObjetivo(uuid);
   } catch (_) {
     // Defaults ya están seteados — log opcional aquí en el futuro.
   }

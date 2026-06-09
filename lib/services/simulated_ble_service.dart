@@ -102,6 +102,11 @@ class SimulatedBleService implements BleSource {
   @override
   Future<bool> reintentarPermisos() async => true;
 
+  /// El simulador no filtra por UUID — emite lo configurado en
+  /// `beacon_config.json` directamente. No-op.
+  @override
+  void configurarUuidObjetivo(String uuid) {}
+
   /// Genera y emite una lectura sintética por cada baliza registrada,
   /// basada en la posición virtual actual.
   void _emitirCiclo() {

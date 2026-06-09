@@ -83,6 +83,7 @@ class BleService implements BleSource {
   /// Cambia el UUID que se acepta como válido. Útil para cargar el
   /// valor real desde `beacon_config.json` después de construir el
   /// servicio (el constructor corre antes que async I/O en main).
+  @override
   void configurarUuidObjetivo(String uuid) {
     _uuidObjetivo = uuid.toLowerCase();
   }

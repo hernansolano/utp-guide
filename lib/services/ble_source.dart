@@ -34,6 +34,12 @@ abstract interface class BleSource {
   /// Snapshot sincrónico del estado actual.
   BleEstado get estadoActual;
 
+  /// Cambia el UUID de iBeacon que se acepta. Las implementaciones
+  /// pueden requerir reiniciar el escaneo para aplicarlo. Las
+  /// implementaciones sin filtro por UUID (ej. simulador) pueden
+  /// ignorarlo. `main()` lo invoca tras cargar `beacon_config.json`.
+  void configurarUuidObjetivo(String uuid);
+
   /// Arranca la emisión de lecturas. Async porque puede requerir
   /// permisos del sistema o inicialización de Bluetooth.
   Future<void> iniciarEscaneo();

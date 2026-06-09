@@ -74,6 +74,15 @@ class BleSourceMultiplexer implements BleSource {
   @override
   Future<bool> reintentarPermisos() => _fuenteActiva.reintentarPermisos();
 
+  /// Propagamos el UUID a las DOS fuentes — al simulador no le afecta
+  /// (no-op), al real sí. Si después se cambia, ambas quedan
+  /// sincronizadas independientemente de cuál esté activa.
+  @override
+  void configurarUuidObjetivo(String uuid) {
+    _real.configurarUuidObjetivo(uuid);
+    _simulado.configurarUuidObjetivo(uuid);
+  }
+
   @override
   Future<void> detenerEscaneo() async {
     if (!_activo) return;

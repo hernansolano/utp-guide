@@ -54,6 +54,13 @@
 	<string>UTP-Guide usa Bluetooth para calcular tu posición dentro del edificio y guiarte a tu destino.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>UTP-Guide usa Bluetooth para calcular tu posición dentro del edificio y guiarte a tu destino.</string>
+	<!-- Location (requerido por Core Location para detectar iBeacons en
+	     iOS — Apple bloquea iBeacons via Core Bluetooth, solo Core
+	     Location los expone). Ver flutter_beacon docs. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>UTP-Guide usa tu ubicación para detectar las balizas Bluetooth instaladas en el edificio y calcular tu posición en el mapa.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>UTP-Guide usa tu ubicación para detectar las balizas Bluetooth instaladas en el edificio y calcular tu posición en el mapa.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
