@@ -113,6 +113,7 @@ class _SearchScreenState extends State<SearchScreen> {
             activeTab: 'search',
             onTabChanged: (tab) {
               if (tab == 'home') context.go('/');
+              if (tab == 'map') context.push('/explorar');
               if (tab == 'settings') context.push('/settings');
             },
           ),

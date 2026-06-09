@@ -109,6 +109,16 @@ class BeaconRepository {
     return beacons.map((b) => b.minor).toList();
   }
 
+  /// UUID del proyecto, leído del campo `uuid` de `beacon_config.json`.
+  ///
+  /// Es el UUID que el `BleService` filtra al escanear advertisements
+  /// iBeacon. Si la persona que instala balizas quiere usar otro UUID,
+  /// basta con cambiarlo aquí — no requiere recompilar.
+  Future<String> obtenerUuid() async {
+    final data = await _load();
+    return data['uuid'] as String;
+  }
+
   Future<List<ConfigBeacon>> _obtenerTodosLosBeacons() async {
     if (_cachedBeacons != null) return _cachedBeacons!;
     final data = await _load();

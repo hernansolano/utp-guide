@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../data/repositories/beacon_repository.dart';
+import '../models/advertisement_crudo.dart';
 import '../models/beacon_config.dart';
 import '../models/beacon_reading.dart';
 import '../models/position.dart';
@@ -44,6 +45,7 @@ class SimulatedBleService implements BleSource {
 
   final _beaconCtrl = StreamController<BeaconReading>.broadcast();
   final _estadoCtrl = StreamController<BleEstado>.broadcast();
+  final _crudoCtrl = StreamController<AdvertisementCrudo>.broadcast();
   BleEstado _estado = BleEstado.inactivo;
 
   Timer? _timerEmision;
@@ -62,6 +64,9 @@ class SimulatedBleService implements BleSource {
 
   @override
   Stream<BleEstado> get estadoStream => _estadoCtrl.stream;
+
+  @override
+  Stream<AdvertisementCrudo> get advertisementsCrudosStream => _crudoCtrl.stream;
 
   @override
   BleEstado get estadoActual => _estado;
@@ -103,6 +108,20 @@ class SimulatedBleService implements BleSource {
     for (final beacon in beacons) {
       final reading = _generarLectura(pos, beacon, cal);
       if (!_beaconCtrl.isClosed) _beaconCtrl.add(reading);
+      // Reflejo la lectura como advertisement crudo aceptado para que la
+      // pantalla de diagnóstico vea actividad incluso en modo simulación.
+      if (kDebugMode && !_crudoCtrl.isClosed) {
+        _crudoCtrl.add(AdvertisementCrudo(
+          deviceId: 'sim:${beacon.minor}',
+          rssi: reading.rssi,
+          formato: FormatoBalizaBle.iBeacon,
+          uuid: 'simulado',
+          major: reading.major,
+          minor: reading.minor,
+          aceptado: true,
+          timestamp: reading.timestamp,
+        ));
+      }
     }
   }
 
@@ -150,5 +169,6 @@ class SimulatedBleService implements BleSource {
     detenerEscaneo();
     _beaconCtrl.close();
     _estadoCtrl.close();
+    _crudoCtrl.close();
   }
 }

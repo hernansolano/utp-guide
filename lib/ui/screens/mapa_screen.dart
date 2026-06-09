@@ -79,9 +79,14 @@ class _MapaScreenState extends State<MapaScreen> {
   /// que termine la carga inicial.
   String? _svgPath;
 
-  // Posición BLE del usuario (null = sin señal).
-  Position? _posicionUsuario;
-  int _beaconsActivos = 0;
+  // Posición BLE del usuario expuesta como notifier — así el rebuild
+  // por cada lectura se aísla al MapView y al chip BLE, en lugar de
+  // hacer setState global del Stack entero (6+ widgets de overlay).
+  // Crítico para Android: las lecturas pueden llegar a 6-10 Hz.
+  final ValueNotifier<Position?> _posicionUsuarioNotifier =
+      ValueNotifier<Position?>(null);
+  final ValueNotifier<int> _beaconsActivosNotifier = ValueNotifier<int>(0);
+
   BleEstado _bleEstado = BleEstado.inactivo;
   bool _dialogoBlePendiente = false;
 
@@ -252,19 +257,23 @@ class _MapaScreenState extends State<MapaScreen> {
 
     _posicionSub = widget.positioningService.posicionStream.listen((pos) {
       if (!mounted) return;
+      // Updates de alta frecuencia van por notifiers — no causan
+      // rebuild del Stack completo.
+      _posicionUsuarioNotifier.value = pos;
+      _beaconsActivosNotifier.value =
+          widget.positioningService.beaconsActivos;
+
+      // El paso actual cambia con baja frecuencia (al cruzar un nodo).
+      // Solo setState cuando realmente cambia, para que la navigation
+      // card se actualice sin rebuild en cada lectura.
       final nuevoIndice = _calcularPasoActual(pos);
-      final indiceCambio = nuevoIndice != _pasoActualIndice;
-      setState(() {
-        _posicionUsuario = pos;
-        _beaconsActivos = widget.positioningService.beaconsActivos;
-        _pasoActualIndice = nuevoIndice;
-      });
-      // Si cambió el paso y la voz está activa, leer la nueva instrucción.
-      if (indiceCambio &&
-          widget.vozHabilitadaNotifier.value &&
-          _pasos.isNotEmpty &&
-          nuevoIndice < _pasos.length) {
-        widget.ttsService.hablar(_pasos[nuevoIndice].instruccion);
+      if (nuevoIndice != _pasoActualIndice) {
+        setState(() => _pasoActualIndice = nuevoIndice);
+        if (widget.vozHabilitadaNotifier.value &&
+            _pasos.isNotEmpty &&
+            nuevoIndice < _pasos.length) {
+          widget.ttsService.hablar(_pasos[nuevoIndice].instruccion);
+        }
       }
     });
 
@@ -331,7 +340,7 @@ class _MapaScreenState extends State<MapaScreen> {
   /// - Con posición + no siguiendo → centrar y activar modo seguir
   /// - Con posición + siguiendo → zoom-in adicional (vista cercana)
   void _onTapBotonUbicacion() {
-    if (_posicionUsuario == null) {
+    if (_posicionUsuarioNotifier.value == null) {
       _mapController.encuadrarRuta();
       return;
     }
@@ -446,6 +455,8 @@ class _MapaScreenState extends State<MapaScreen> {
     _estadoBleSub?.cancel();
     _mapController.removeListener(_onMapControllerCambio);
     _mapController.dispose();
+    _posicionUsuarioNotifier.dispose();
+    _beaconsActivosNotifier.dispose();
     widget.ttsService.detener();
     widget.positioningService.detener();
     super.dispose();
@@ -509,7 +520,9 @@ class _MapaScreenState extends State<MapaScreen> {
             child: Stack(
               children: [
                 // Mapa principal: MapView encapsula SVG + ruta + dot
-                // + pan/zoom + animaciones de cámara.
+                // + pan/zoom + animaciones de cámara. Solo rebuilda
+                // cuando cambia simulación/posición virtual/dot — no
+                // cuando cambia algo del overlay.
                 Positioned.fill(
                   child: ValueListenableBuilder<bool>(
                     valueListenable: widget.modoSimulacionNotifier,
@@ -517,15 +530,20 @@ class _MapaScreenState extends State<MapaScreen> {
                       return ValueListenableBuilder<Position?>(
                         valueListenable: widget.posicionVirtualNotifier,
                         builder: (_, posVirtual, _) {
-                          return MapView(
-                            mapaSize: mapaSize,
-                            svgAsset: _svgPath,
-                            ruta: _ruta,
-                            posicionUsuario: _posicionUsuario,
-                            posicionTarget: simulando ? posVirtual : null,
-                            panZoomHabilitado: !simulando,
-                            onTapMundo: simulando ? _onTapPosicionVirtual : null,
-                            controller: _mapController,
+                          return ValueListenableBuilder<Position?>(
+                            valueListenable: _posicionUsuarioNotifier,
+                            builder: (_, posUsuario, _) {
+                              return MapView(
+                                mapaSize: mapaSize,
+                                svgAsset: _svgPath,
+                                ruta: _ruta,
+                                posicionUsuario: posUsuario,
+                                posicionTarget: simulando ? posVirtual : null,
+                                panZoomHabilitado: !simulando,
+                                onTapMundo: simulando ? _onTapPosicionVirtual : null,
+                                controller: _mapController,
+                              );
+                            },
                           );
                         },
                       );
@@ -577,12 +595,17 @@ class _MapaScreenState extends State<MapaScreen> {
                   ),
                 ),
 
-                // Chip BLE (esquina inferior izquierda).
+                // Chip BLE (esquina inferior izquierda) — escucha los
+                // notifiers en lugar de depender de setState global.
                 if (!_enModoAR)
                   Positioned(
                     left: 16,
                     bottom: 16,
-                    child: _buildBleChip(colors),
+                    child: ListenableBuilder(
+                      listenable: Listenable.merge(
+                          [_posicionUsuarioNotifier, _beaconsActivosNotifier]),
+                      builder: (_, _) => _buildBleChip(colors),
+                    ),
                   ),
 
                 // FAB AR/Mapa.
@@ -636,9 +659,12 @@ class _MapaScreenState extends State<MapaScreen> {
                       return Positioned(
                         top: MediaQuery.of(context).padding.top + 80,
                         left: 16,
-                        child: _DebugOverlay(
-                          positioningService: widget.positioningService,
-                          posicionSnapped: _posicionUsuario,
+                        child: ValueListenableBuilder<Position?>(
+                          valueListenable: _posicionUsuarioNotifier,
+                          builder: (_, pos, _) => _DebugOverlay(
+                            positioningService: widget.positioningService,
+                            posicionSnapped: pos,
+                          ),
                         ),
                       );
                     },
@@ -647,7 +673,13 @@ class _MapaScreenState extends State<MapaScreen> {
             ),
           ),
 
-          _buildNavigationCard(context, colors, nombreDestino),
+          // La card sigue el notifier de posición para mostrar coords
+          // frescas sin requerir setState global del Stack.
+          ValueListenableBuilder<Position?>(
+            valueListenable: _posicionUsuarioNotifier,
+            builder: (_, _, _) =>
+                _buildNavigationCard(context, colors, nombreDestino),
+          ),
 
           BottomNavWidget(
             activeTab: 'map',
@@ -781,11 +813,12 @@ class _MapaScreenState extends State<MapaScreen> {
   }
 
   Widget _buildBleChip(AppColors colors) {
-    final tienePos = _posicionUsuario != null;
+    final tienePos = _posicionUsuarioNotifier.value != null;
+    final beacons = _beaconsActivosNotifier.value;
     final bgColor = tienePos ? colors.accessible : colors.bgMuted;
     final fgColor = tienePos ? Colors.white : colors.fgSoft;
     final label = tienePos
-        ? 'BLE · $_beaconsActivos baliza${_beaconsActivos != 1 ? 's' : ''}'
+        ? 'BLE · $beacons baliza${beacons != 1 ? 's' : ''}'
         : 'Sin señal BLE';
 
     return Container(
@@ -832,13 +865,14 @@ class _MapaScreenState extends State<MapaScreen> {
     final tituloLinea = paso?.instruccion ?? 'Calculando ruta…';
     final iconoPaso = paso?.icono ?? Icons.straight_rounded;
 
+    final posUsuario = _posicionUsuarioNotifier.value;
     final String subtitulo;
     if (esLlegada) {
       subtitulo = '¡Has llegado!';
-    } else if (_posicionUsuario != null) {
+    } else if (posUsuario != null) {
       subtitulo = 'Paso ${_pasoActualIndice + 1} de ${_pasos.length}'
-          ' · (${_posicionUsuario!.x.toStringAsFixed(1)} m, '
-          '${_posicionUsuario!.y.toStringAsFixed(1)} m)';
+          ' · (${posUsuario.x.toStringAsFixed(1)} m, '
+          '${posUsuario.y.toStringAsFixed(1)} m)';
     } else {
       subtitulo = paso != null && _pasos.length > 1
           ? 'Paso ${_pasoActualIndice + 1} de ${_pasos.length}'

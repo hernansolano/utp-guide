@@ -1,3 +1,4 @@
+import '../models/advertisement_crudo.dart';
 import '../models/beacon_reading.dart';
 import 'ble_service.dart' show BleEstado;
 
@@ -20,6 +21,15 @@ abstract interface class BleSource {
   /// Stream del estado del servicio (escaneando, permisos, BT apagado,
   /// simulando, error). La UI lo consume para mostrar mensajes.
   Stream<BleEstado> get estadoStream;
+
+  /// Stream de advertisements BLE crudos para herramientas de diagnóstico.
+  ///
+  /// Emite **todos** los paquetes recibidos, incluso los descartados por
+  /// no coincidir con el UUID del proyecto o por usar formato desconocido.
+  /// Cada [AdvertisementCrudo] incluye el motivo del descarte cuando
+  /// aplica. Solo se emite si la fuente está corriendo en `kDebugMode` —
+  /// en release el stream existe pero no recibe eventos, evitando overhead.
+  Stream<AdvertisementCrudo> get advertisementsCrudosStream;
 
   /// Snapshot sincrónico del estado actual.
   BleEstado get estadoActual;

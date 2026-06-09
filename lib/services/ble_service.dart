@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../models/advertisement_crudo.dart';
 import '../models/beacon_reading.dart';
 import 'ble_source.dart';
 
@@ -50,25 +52,43 @@ enum BleEstado {
 /// Si alguna condición falla, el servicio emite el estado correspondiente
 /// vía [estadoStream] y la UI puede reaccionar.
 ///
-/// Uso típico:
-/// ```dart
-/// final ble = BleService();
-/// ble.estadoStream.listen((estado) { /* actualizar UI */ });
-/// ble.beaconStream.listen((reading) { /* procesar lectura */ });
-/// await ble.iniciarEscaneo();
-/// ```
+/// **UUID configurable:** el UUID que filtra se setea con
+/// [configurarUuidObjetivo]. Si no se llama, se usa el default histórico
+/// del proyecto. `main()` lo llama después de cargar `beacon_config.json`.
+///
+/// **Diagnóstico:** en `kDebugMode`, todo advertisement BLE recibido se
+/// emite también por [advertisementsCrudosStream], incluyendo los
+/// descartados por UUID distinto o formato no iBeacon. La pantalla de
+/// calibración lo consume para mostrar al dev qué emite el simulador.
 class BleService implements BleSource {
-  // UUID del proyecto, definido en beacon_config.json.
-  // Hardcoded aquí porque el servicio se inicializa antes de cargar el
-  // repositorio; el UUID se usa para filtrar paquetes a nivel de parser.
-  static const _targetUuid = '550e8400-e29b-41d4-a716-446655440000';
+  /// UUID por defecto si nadie llama [configurarUuidObjetivo]. Coincide
+  /// con el valor histórico del beacon_config.json del proyecto.
+  static const _uuidDefault = '550e8400-e29b-41d4-a716-446655440000';
+
+  /// UUID del proyecto (lowercase). Mutable para permitir cargar desde
+  /// JSON después de construir el servicio.
+  String _uuidObjetivo;
 
   final _beaconController = StreamController<BeaconReading>.broadcast();
   final _estadoController = StreamController<BleEstado>.broadcast();
+  final _crudoController = StreamController<AdvertisementCrudo>.broadcast();
   StreamSubscription<List<ScanResult>>? _scanSub;
   Timer? _restartTimer;
   bool _activo = false;
   BleEstado _estadoActual = BleEstado.inactivo;
+
+  BleService({String? uuidObjetivo})
+      : _uuidObjetivo = (uuidObjetivo ?? _uuidDefault).toLowerCase();
+
+  /// Cambia el UUID que se acepta como válido. Útil para cargar el
+  /// valor real desde `beacon_config.json` después de construir el
+  /// servicio (el constructor corre antes que async I/O en main).
+  void configurarUuidObjetivo(String uuid) {
+    _uuidObjetivo = uuid.toLowerCase();
+  }
+
+  /// UUID activo (lowercase, formato canónico 8-4-4-4-12).
+  String get uuidObjetivo => _uuidObjetivo;
 
   /// Stream de lecturas de balizas que coinciden con el UUID del proyecto.
   @override
@@ -78,6 +98,12 @@ class BleService implements BleSource {
   /// diálogos o mensajes de error específicos al usuario.
   @override
   Stream<BleEstado> get estadoStream => _estadoController.stream;
+
+  /// Stream de TODOS los advertisements BLE recibidos, sin filtrar.
+  /// Solo emite en kDebugMode. Ver [BleSource.advertisementsCrudosStream].
+  @override
+  Stream<AdvertisementCrudo> get advertisementsCrudosStream =>
+      _crudoController.stream;
 
   /// Último estado emitido. Útil para inicializar UI sin esperar el
   /// primer evento del stream.
@@ -190,42 +216,107 @@ class BleService implements BleSource {
 
   void _procesarResultados(List<ScanResult> results) {
     for (final r in results) {
-      final reading = _parsearIBeacon(r);
-      if (reading != null && !_beaconController.isClosed) {
-        _beaconController.add(reading);
-      }
+      _procesarUnResultado(r);
     }
   }
 
-  /// Parsea el manufacturer data de un ScanResult como iBeacon.
-  ///
-  /// Formato iBeacon (después de filtrar el Company ID 0x004C de Apple):
-  /// ```
-  /// byte[0]    = 0x02 (tipo iBeacon)
-  /// byte[1]    = 0x15 (longitud de los siguientes bytes = 21)
-  /// byte[2..17] = UUID (16 bytes, big-endian)
-  /// byte[18..19] = Major (2 bytes, big-endian)
-  /// byte[20..21] = Minor (2 bytes, big-endian)
-  /// byte[22]   = TX Power calibrado (1 byte, signed)
-  /// ```
-  ///
-  /// Retorna `null` si el paquete no es un iBeacon o si su UUID no
-  /// coincide con [_targetUuid].
-  BeaconReading? _parsearIBeacon(ScanResult result) {
+  /// Intenta parsear como iBeacon. Si lo es, valida UUID y o bien emite
+  /// un [BeaconReading] (UUID match) o un [AdvertisementCrudo] descartado
+  /// (UUID distinto). Si no es iBeacon, intenta detectar Eddystone y
+  /// reporta como crudo. Si nada match, emite "BLE genérico" en debug.
+  void _procesarUnResultado(ScanResult result) {
     final mfData = result.advertisementData.manufacturerData[0x004C];
-    if (mfData == null || mfData.length < 23) return null;
-    if (mfData[0] != 0x02 || mfData[1] != 0x15) return null;
+    final esIBeaconValido =
+        mfData != null && mfData.length >= 23 && mfData[0] == 0x02 && mfData[1] == 0x15;
 
+    if (esIBeaconValido) {
+      _manejarIBeacon(result, mfData);
+      return;
+    }
+
+    // No es iBeacon — chequear Eddystone para informar al usuario que
+    // está usando un formato no soportado.
+    if (_pareceEddystone(result)) {
+      _emitirCrudo(AdvertisementCrudo(
+        deviceId: result.device.remoteId.str,
+        rssi: result.rssi.toDouble(),
+        formato: FormatoBalizaBle.eddystoneUid,
+        aceptado: false,
+        timestamp: DateTime.now(),
+        motivoDescarte: 'Eddystone no soportado · use iBeacon en el simulador',
+      ));
+      return;
+    }
+
+    // BLE genérico — solo emitir en debug para no inundar UI con
+    // dispositivos cercanos (audífonos, teléfonos, etc.).
+    if (kDebugMode) {
+      _emitirCrudo(AdvertisementCrudo(
+        deviceId: result.device.remoteId.str,
+        rssi: result.rssi.toDouble(),
+        formato: FormatoBalizaBle.desconocido,
+        aceptado: false,
+        timestamp: DateTime.now(),
+        motivoDescarte: 'No es iBeacon ni Eddystone',
+      ));
+    }
+  }
+
+  /// Parsea un paquete iBeacon ya validado. Si el UUID coincide con el
+  /// objetivo, emite [BeaconReading]; si no, lo reporta como descartado.
+  void _manejarIBeacon(ScanResult result, List<int> mfData) {
     final uuid = _parsearUuid(mfData.sublist(2, 18));
-    if (uuid.toLowerCase() != _targetUuid) return null;
-
+    final major = (mfData[18] << 8) | mfData[19];
     final minor = (mfData[20] << 8) | mfData[21];
+    final uuidLower = uuid.toLowerCase();
+    final uuidMatch = uuidLower == _uuidObjetivo;
 
-    return BeaconReading(
-      minor: minor,
-      rssi: result.rssi.toDouble(),
-      timestamp: DateTime.now(),
-    );
+    if (uuidMatch) {
+      if (!_beaconController.isClosed) {
+        _beaconController.add(BeaconReading(
+          minor: minor,
+          major: major,
+          rssi: result.rssi.toDouble(),
+          timestamp: DateTime.now(),
+        ));
+      }
+      _emitirCrudo(AdvertisementCrudo(
+        deviceId: result.device.remoteId.str,
+        rssi: result.rssi.toDouble(),
+        formato: FormatoBalizaBle.iBeacon,
+        uuid: uuidLower,
+        major: major,
+        minor: minor,
+        aceptado: true,
+        timestamp: DateTime.now(),
+      ));
+    } else {
+      _emitirCrudo(AdvertisementCrudo(
+        deviceId: result.device.remoteId.str,
+        rssi: result.rssi.toDouble(),
+        formato: FormatoBalizaBle.iBeacon,
+        uuid: uuidLower,
+        major: major,
+        minor: minor,
+        aceptado: false,
+        timestamp: DateTime.now(),
+        motivoDescarte: 'UUID distinto al del proyecto',
+      ));
+    }
+  }
+
+  /// Detecta si el advertisement parece ser Eddystone, buscando el UUID
+  /// de servicio 0xFEAA en cualquier formato (16-bit o 128-bit canónico).
+  bool _pareceEddystone(ScanResult result) {
+    for (final guid in result.advertisementData.serviceData.keys) {
+      final s = guid.str.toLowerCase();
+      if (s.startsWith('feaa') || s.contains('0000feaa-')) return true;
+    }
+    for (final guid in result.advertisementData.serviceUuids) {
+      final s = guid.str.toLowerCase();
+      if (s.startsWith('feaa') || s.contains('0000feaa-')) return true;
+    }
+    return false;
   }
 
   /// Convierte 16 bytes a formato UUID estándar.
@@ -239,6 +330,10 @@ class BleService implements BleSource {
         '${hex.substring(20)}';
   }
 
+  void _emitirCrudo(AdvertisementCrudo a) {
+    if (!_crudoController.isClosed) _crudoController.add(a);
+  }
+
   void _emitir(BleEstado nuevo) {
     _estadoActual = nuevo;
     if (!_estadoController.isClosed) _estadoController.add(nuevo);
@@ -249,5 +344,6 @@ class BleService implements BleSource {
     detenerEscaneo();
     _beaconController.close();
     _estadoController.close();
+    _crudoController.close();
   }
 }

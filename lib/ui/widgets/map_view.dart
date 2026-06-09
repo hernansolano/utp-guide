@@ -38,6 +38,15 @@ class MapView extends StatefulWidget {
   /// oculta el indicador.
   final Position? posicionTarget;
 
+  /// Lista de POIs a dibujar sobre el mapa (modo exploración).
+  /// Cada POI es un dot coloreado según su tipo (salón, baño, etc.).
+  /// Si está vacía, no se pinta nada extra.
+  final List<Nodo> pois;
+
+  /// ID del POI a destacar visualmente (anillo más grande + halo).
+  /// Útil cuando el usuario tocó cerca de un POI específico.
+  final String? poiResaltadoId;
+
   /// Si true, se pueden hacer pan/zoom con gestos. En modo simulación
   /// se desactiva para que el gesto del dedo coloque la posición
   /// virtual en lugar de mover la cámara.
@@ -68,6 +77,8 @@ class MapView extends StatefulWidget {
     this.maxZoom = 6.0,
     this.onTapMundo,
     this.controller,
+    this.pois = const [],
+    this.poiResaltadoId,
   });
 
   @override
@@ -354,6 +365,8 @@ class _MapViewState extends State<MapView>
             ruta: widget.ruta,
             mapaSize: widget.mapaSize,
             posicionUsuario: widget.posicionUsuario,
+            pois: widget.pois,
+            poiResaltadoId: widget.poiResaltadoId,
           ),
           size: box,
         ),

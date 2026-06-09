@@ -384,10 +384,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onTabChanged(String tab) {
-    // El tab 'map' desde Home no abre el mapa directo (porque requiere
-    // un destino); abre el buscador para que el usuario elija primero.
+    // El tab 'map' va a la pantalla de exploración libre — el usuario
+    // puede ver el piso y tocar un POI para elegir destino sin pasar
+    // por la lista de búsqueda.
     switch (tab) {
-      case 'search' || 'map':
+      case 'map':
+        context.push('/explorar');
+      case 'search':
         context.push('/search');
       case 'settings':
         context.push('/settings');

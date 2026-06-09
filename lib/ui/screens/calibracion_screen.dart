@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/beacon_repository.dart';
 import '../../data/repositories/grafo_repository.dart';
+import '../../models/advertisement_crudo.dart';
 import '../../models/beacon_config.dart';
 import '../../models/beacon_reading.dart';
 import '../../models/beacon_stats.dart';
@@ -68,6 +70,22 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
   StreamSubscription<BeaconReading>? _readingsSub;
   StreamSubscription<BleEstado>? _estadoSub;
   StreamSubscription<Position?>? _posSub;
+  StreamSubscription<AdvertisementCrudo>? _crudoSub;
+
+  /// Throttling de rebuilds: las lecturas BLE pueden llegar a 6-10 Hz,
+  /// pero la UI no necesita rebuilds tan frecuentes. Acumulamos cambios
+  /// y hacemos `setState` máximo cada 250 ms (4 Hz visual). Esto reduce
+  /// drásticamente el costo en Android.
+  Timer? _throttleTimer;
+  bool _hayCambiosPendientes = false;
+
+  /// Últimos advertisements crudos por deviceId (LRU: máximo
+  /// [_maxAdvertisementsListados] entries). Se muestra en la sección
+  /// "Diagnóstico BLE" para que el dev vea qué emite el simulador o las
+  /// balizas físicas, incluso si no son aceptadas por el pipeline.
+  static const _maxAdvertisementsListados = 20;
+  final LinkedHashMap<String, AdvertisementCrudo> _advertisements =
+      LinkedHashMap<String, AdvertisementCrudo>();
 
   /// Inputs de la herramienta "Distancia conocida".
   int? _minorSeleccionado;
@@ -100,7 +118,19 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     _estadoSub = widget.positioningService.estadoBleStream.listen((e) {
       if (mounted) setState(() => _bleEstado = e);
     });
+    _crudoSub = widget.positioningService.advertisementsCrudosStream
+        .listen(_onAdvertisementCrudo);
     _bleEstado = widget.positioningService.estadoBleActual;
+
+    // Timer único que coalesce todos los updates de balizas y advertisements
+    // a una sola llamada a setState cada 250 ms.
+    _throttleTimer =
+        Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (_hayCambiosPendientes && mounted) {
+        _hayCambiosPendientes = false;
+        setState(() {});
+      }
+    });
   }
 
   Future<void> _cargarConfigs() async {
@@ -172,7 +202,22 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     final stats = _stats.putIfAbsent(
         r.minor, () => BeaconStats(minor: r.minor));
     stats.agregar(r.rssi, distancia, r.timestamp);
-    if (mounted) setState(() {});
+    // Marcar para que el timer haga setState — evita rebuilds por lectura.
+    _hayCambiosPendientes = true;
+  }
+
+  /// Cada advertisement BLE recibido (filtrado o no). Mantenemos solo el
+  /// último por deviceId con cap [_maxAdvertisementsListados] para no
+  /// crecer indefinidamente en sesiones largas.
+  void _onAdvertisementCrudo(AdvertisementCrudo a) {
+    // Si ya existe, lo quitamos antes de re-insertar para que pase al
+    // final (LinkedHashMap mantiene orden de inserción).
+    _advertisements.remove(a.deviceId);
+    _advertisements[a.deviceId] = a;
+    while (_advertisements.length > _maxAdvertisementsListados) {
+      _advertisements.remove(_advertisements.keys.first);
+    }
+    _hayCambiosPendientes = true;
   }
 
   @override
@@ -181,6 +226,8 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     _readingsSub?.cancel();
     _estadoSub?.cancel();
     _posSub?.cancel();
+    _crudoSub?.cancel();
+    _throttleTimer?.cancel();
     _distanciaController.dispose();
     widget.positioningService.detener();
     super.dispose();
@@ -299,13 +346,19 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                 children: [
                   _buildAvisoEstadoBle(context, colors),
                   const SizedBox(height: 16),
-                  _buildSeccionValidacionPosicion(context, colors),
+                  // Diagnóstico arriba — primera cosa al abrir es ver si
+                  // llegan paquetes BLE y de qué formato.
+                  _buildSeccionDiagnosticoBle(context, colors),
+                  const SizedBox(height: 16),
+                  // Sliders subidos — son la herramienta principal de la
+                  // pantalla y antes estaban casi al final del scroll.
+                  _buildSeccionSliders(context, colors),
                   const SizedBox(height: 16),
                   _buildSeccionBalizas(context, colors),
                   const SizedBox(height: 16),
-                  _buildSeccionDistanciaConocida(context, colors),
+                  _buildSeccionValidacionPosicion(context, colors),
                   const SizedBox(height: 16),
-                  _buildSeccionSliders(context, colors),
+                  _buildSeccionDistanciaConocida(context, colors),
                   const SizedBox(height: 16),
                   _buildSeccionValoresJson(context, colors),
                   const SizedBox(height: 8),
@@ -420,6 +473,43 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSeccionDiagnosticoBle(BuildContext context, AppColors colors) {
+    final items = _advertisements.values.toList().reversed.toList();
+    final aceptados = items.where((a) => a.aceptado).length;
+    final descartados = items.length - aceptados;
+
+    return _Card(
+      title: 'Diagnóstico BLE',
+      subtitle: items.isEmpty
+          ? 'Sin paquetes recibidos · si tu simulador está activo, '
+              'revisá Bluetooth y permisos'
+          : '${items.length} dispositivos · $aceptados aceptados · '
+              '$descartados descartados',
+      child: items.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: Text(
+                  'Esperando advertisements BLE…',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: colors.fgMuted,
+                  ),
+                ),
+              ),
+            )
+          : Column(
+              children: [
+                for (int i = 0; i < items.length; i++) ...[
+                  _FilaAdvertisement(item: items[i]),
+                  if (i < items.length - 1)
+                    Divider(height: 12, color: colors.line),
+                ],
+              ],
+            ),
     );
   }
 
@@ -1070,6 +1160,108 @@ class _FilaBeacon extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Fila compacta para mostrar un advertisement BLE en la sección de
+/// diagnóstico. Distingue visualmente aceptados (verde) vs descartados
+/// (gris/naranja según motivo).
+class _FilaAdvertisement extends StatelessWidget {
+  final AdvertisementCrudo item;
+  const _FilaAdvertisement({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final esAceptado = item.aceptado;
+    final colorPrincipal = esAceptado
+        ? colors.success
+        : (item.formato == FormatoBalizaBle.iBeacon
+            ? Colors.orange.shade700
+            : colors.fgSoft);
+
+    final uuidCorto =
+        item.uuid == null ? '—' : '${item.uuid!.substring(0, 8)}…';
+    final tagPrincipal = item.major != null && item.minor != null
+        ? '${item.major}.${item.minor}'
+        : item.deviceId.length > 12
+            ? '${item.deviceId.substring(0, 12)}…'
+            : item.deviceId;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          margin: const EdgeInsets.only(top: 6, right: 10),
+          decoration: BoxDecoration(
+            color: colorPrincipal,
+            shape: BoxShape.circle,
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorPrincipal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      item.formatoCorto,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: colorPrincipal,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    tagPrincipal,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: colors.fg,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${item.rssi.toStringAsFixed(0)} dBm',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: colors.fgMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                esAceptado
+                    ? 'UUID $uuidCorto · aceptado'
+                    : 'UUID $uuidCorto · ${item.motivoDescarte}',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  color: colors.fgSoft,
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../models/advertisement_crudo.dart';
 import '../models/beacon_reading.dart';
 import 'ble_service.dart' show BleEstado;
 import 'ble_source.dart';
@@ -28,9 +29,11 @@ class BleSourceMultiplexer implements BleSource {
 
   final _beaconCtrl = StreamController<BeaconReading>.broadcast();
   final _estadoCtrl = StreamController<BleEstado>.broadcast();
+  final _crudoCtrl = StreamController<AdvertisementCrudo>.broadcast();
 
   StreamSubscription<BeaconReading>? _beaconSub;
   StreamSubscription<BleEstado>? _estadoSub;
+  StreamSubscription<AdvertisementCrudo>? _crudoSub;
   BleEstado _estadoActual = BleEstado.inactivo;
   bool _activo = false;
 
@@ -49,6 +52,9 @@ class BleSourceMultiplexer implements BleSource {
 
   @override
   Stream<BleEstado> get estadoStream => _estadoCtrl.stream;
+
+  @override
+  Stream<AdvertisementCrudo> get advertisementsCrudosStream => _crudoCtrl.stream;
 
   @override
   BleEstado get estadoActual => _estadoActual;
@@ -71,8 +77,10 @@ class BleSourceMultiplexer implements BleSource {
     await _fuenteActiva.detenerEscaneo();
     await _beaconSub?.cancel();
     await _estadoSub?.cancel();
+    await _crudoSub?.cancel();
     _beaconSub = null;
     _estadoSub = null;
+    _crudoSub = null;
     _setEstado(BleEstado.inactivo);
   }
 
@@ -96,10 +104,14 @@ class BleSourceMultiplexer implements BleSource {
   Future<void> _engancharAFuenteActiva() async {
     await _beaconSub?.cancel();
     await _estadoSub?.cancel();
+    await _crudoSub?.cancel();
     _beaconSub = _fuenteActiva.beaconStream.listen((r) {
       if (!_beaconCtrl.isClosed) _beaconCtrl.add(r);
     });
     _estadoSub = _fuenteActiva.estadoStream.listen(_setEstado);
+    _crudoSub = _fuenteActiva.advertisementsCrudosStream.listen((a) {
+      if (!_crudoCtrl.isClosed) _crudoCtrl.add(a);
+    });
   }
 
   void _setEstado(BleEstado nuevo) {
@@ -112,6 +124,7 @@ class BleSourceMultiplexer implements BleSource {
     detenerEscaneo();
     _beaconCtrl.close();
     _estadoCtrl.close();
+    _crudoCtrl.close();
     _real.dispose();
     _simulado.dispose();
   }

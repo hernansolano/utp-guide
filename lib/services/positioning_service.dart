@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Offset;
 import '../data/repositories/beacon_repository.dart';
 import '../data/repositories/grafo_repository.dart';
+import '../models/advertisement_crudo.dart';
 import '../models/beacon_config.dart';
 import '../models/beacon_reading.dart';
 import '../models/position.dart';
@@ -64,6 +65,17 @@ class PositioningService {
   // Dimensiones del mapa cargadas del grafo (default = cuarto de prueba 5x5).
   DimensionesMapa _dimensiones = const DimensionesMapa(5.0, 5.0);
 
+  /// Configuración de las balizas cargada al iniciar.
+  /// **Cache crítico para performance:** evita un await por cada lectura
+  /// BLE. Las balizas no cambian durante runtime (la calibración sí, pero
+  /// es otro path). Si el `beacon_config.json` se modificase en vivo —
+  /// hoy no soportado — habría que invalidar este map.
+  final Map<int, _ConfigBeaconCache> _configsBeacon = {};
+
+  /// Snapshot inmutable de los nodos y aristas del grafo, cacheado al
+  /// iniciar para que `_snapToGraph` no haga I/O por cada lectura.
+  List<_AristaConNodos> _aristasCache = const [];
+
   /// Lecturas suavizadas por baliza:
   ///   minor → (cola de distancias FIFO, timestamp de última lectura)
   final _lecturas = <int, _BeaconState>{};
@@ -92,6 +104,13 @@ class PositioningService {
   /// el servicio — el consumidor recibe la misma data que llega del
   /// `BleSource`.
   Stream<BeaconReading> get beaconStreamRaw => _ble.beaconStream;
+
+  /// Stream de advertisements BLE crudos, sin filtrar por UUID ni formato.
+  /// Solo emite en `kDebugMode`. Útil para la pantalla de diagnóstico que
+  /// muestra al dev qué emite el simulador o las balizas físicas, incluso
+  /// si no son aceptadas por el pipeline.
+  Stream<AdvertisementCrudo> get advertisementsCrudosStream =>
+      _ble.advertisementsCrudosStream;
 
   /// Cantidad de balizas distintas con lecturas no expiradas.
   ///
@@ -145,13 +164,62 @@ class PositioningService {
   /// Idempotente con ref counting: si ya hay otros consumidores activos,
   /// solo incrementa el contador. La inicialización real solo ocurre la
   /// primera vez.
+  ///
+  /// Pre-carga en memoria: dimensiones del mapa, configs de balizas,
+  /// nodos y aristas del grafo. Eso elimina los `await` del hot path de
+  /// lecturas BLE (antes había 1 await por txPower y N awaits por
+  /// trilateración por baliza activa) — costo crítico en Android.
   Future<void> iniciar() async {
     _refCount++;
     if (_refCount > 1) return; // ya inicializado por otro consumidor
 
     _dimensiones = await _grafoRepo.obtenerDimensionesMapa();
+    await _precargarBeacons();
+    await _precargarGrafo();
     _bleSub = _ble.beaconStream.listen(_procesarLectura);
     await _ble.iniciarEscaneo();
+  }
+
+  /// Snapshot inmutable de las balizas + txPower efectivo (cae al global
+  /// de la calibración si la baliza no tiene su propio override).
+  Future<void> _precargarBeacons() async {
+    _configsBeacon.clear();
+    final minors = await _beaconRepo.obtenerMinorsRegistrados();
+    for (final m in minors) {
+      try {
+        final c = await _beaconRepo.obtenerConfigBeacon(m);
+        _configsBeacon[m] = _ConfigBeaconCache(
+          minor: c.minor,
+          x: c.x,
+          y: c.y,
+          txPowerDbm: c.txPowerDbm,
+        );
+      } catch (_) {
+        // baliza inválida — saltar
+      }
+    }
+  }
+
+  /// Snapshot inmutable de las aristas con coordenadas pre-resueltas de
+  /// origen y destino (en vez de hacer lookup por id en cada snap).
+  Future<void> _precargarGrafo() async {
+    final nodos = await _grafoRepo.obtenerNodos();
+    final aristas = await _grafoRepo.obtenerAristas();
+    final byId = {for (final n in nodos) n.id: n};
+    final lista = <_AristaConNodos>[];
+    for (final a in aristas) {
+      final origen = byId[a.origenId];
+      final destino = byId[a.destinoId];
+      if (origen != null && destino != null) {
+        lista.add(_AristaConNodos(
+          origenX: origen.x,
+          origenY: origen.y,
+          destinoX: destino.x,
+          destinoY: destino.y,
+        ));
+      }
+    }
+    _aristasCache = lista;
   }
 
   /// Decrementa el ref count. Solo apaga el servicio cuando el contador
@@ -164,6 +232,8 @@ class PositioningService {
     await _bleSub?.cancel();
     _bleSub = null;
     _lecturas.clear();
+    _configsBeacon.clear();
+    _aristasCache = const [];
     await _ble.detenerEscaneo();
   }
 
@@ -175,9 +245,12 @@ class PositioningService {
     _debugPosicionCruda = null;
   }
 
-  Future<void> _procesarLectura(BeaconReading lectura) async {
+  /// Hot path: se ejecuta hasta varias veces por segundo. **Cero awaits**
+  /// — toda la información (txPower, posición de balizas, grafo) está en
+  /// memoria gracias a [_precargarBeacons] y [_precargarGrafo].
+  void _procesarLectura(BeaconReading lectura) {
     // 1. Modelo de path-loss → distancia
-    final txPower = await _txPowerPara(lectura.minor);
+    final txPower = _txPowerSync(lectura.minor);
     final distancia = pow(10.0,
             (txPower - lectura.rssi) / (10.0 * _calibracion.nExponentePerdida))
         .toDouble();
@@ -193,16 +266,13 @@ class PositioningService {
     _limpiarObsoletos();
 
     // 4 + 5. Trilateración + snap-to-graph
-    final pos = await _trilaterar();
+    final pos = _trilaterarSync();
     if (!_controller.isClosed) _controller.add(pos);
   }
 
-  Future<double> _txPowerPara(int minor) async {
-    try {
-      return await _beaconRepo.obtenerTxPower(minor);
-    } catch (_) {
-      return _calibracion.txPowerDbmDefault;
-    }
+  double _txPowerSync(int minor) {
+    final c = _configsBeacon[minor];
+    return c?.txPowerDbm ?? _calibracion.txPowerDbmDefault;
   }
 
   void _limpiarObsoletos() {
@@ -212,22 +282,19 @@ class PositioningService {
         ahora.difference(state.ultimoTimestamp) > umbral);
   }
 
-  Future<Position?> _trilaterar() async {
+  Position? _trilaterarSync() {
     if (_lecturas.isEmpty) return null;
 
     double sumX = 0, sumY = 0, sumW = 0;
 
     for (final entry in _lecturas.entries) {
-      try {
-        final config = await _beaconRepo.obtenerConfigBeacon(entry.key);
-        final avgDist = entry.value.promedio;
-        final w = 1.0 / max(avgDist * avgDist, 0.01);
-        sumX += config.x * w;
-        sumY += config.y * w;
-        sumW += w;
-      } catch (_) {
-        // ignore
-      }
+      final config = _configsBeacon[entry.key];
+      if (config == null) continue;
+      final avgDist = entry.value.promedio;
+      final w = 1.0 / max(avgDist * avgDist, 0.01);
+      sumX += config.x * w;
+      sumY += config.y * w;
+      sumW += w;
     }
 
     if (sumW == 0) return null;
@@ -238,47 +305,36 @@ class PositioningService {
     _debugPosicionCruda =
         Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
 
-    return await _snapToGraph(x, y);
+    return _snapToGraphSync(x, y);
   }
 
-  Future<Position> _snapToGraph(double x, double y) async {
-    try {
-      final nodos = await _grafoRepo.obtenerNodos();
-      final aristas = await _grafoRepo.obtenerAristas();
-      final mapaDeNodos = {for (final n in nodos) n.id: n};
+  Position _snapToGraphSync(double x, double y) {
+    double minDist = double.infinity;
+    double snapX = x, snapY = y;
 
-      double minDist = double.infinity;
-      double snapX = x, snapY = y;
-
-      for (final arista in aristas) {
-        final a = mapaDeNodos[arista.origenId];
-        final b = mapaDeNodos[arista.destinoId];
-        if (a == null || b == null) continue;
-
-        final closest = _puntoEnSegmento(x, y, a.x, a.y, b.x, b.y);
-        final dist =
-            sqrt(pow(closest.dx - x, 2) + pow(closest.dy - y, 2));
-        if (dist < minDist) {
-          minDist = dist;
-          snapX = closest.dx;
-          snapY = closest.dy;
-        }
+    for (final arista in _aristasCache) {
+      final closest = _puntoEnSegmento(
+          x, y, arista.origenX, arista.origenY, arista.destinoX, arista.destinoY);
+      final dist =
+          sqrt(pow(closest.dx - x, 2) + pow(closest.dy - y, 2));
+      if (dist < minDist) {
+        minDist = dist;
+        snapX = closest.dx;
+        snapY = closest.dy;
       }
-
-      final dentroDeTolerancia =
-          minDist <= _calibracion.toleranciaSnapMetros;
-      final finalX = dentroDeTolerancia ? snapX : x;
-      final finalY = dentroDeTolerancia ? snapY : y;
-
-      return Position(
-        x: finalX,
-        y: finalY,
-        piso: 1,
-        timestamp: DateTime.now(),
-      );
-    } catch (_) {
-      return Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
     }
+
+    final dentroDeTolerancia =
+        minDist <= _calibracion.toleranciaSnapMetros;
+    final finalX = dentroDeTolerancia ? snapX : x;
+    final finalY = dentroDeTolerancia ? snapY : y;
+
+    return Position(
+      x: finalX,
+      y: finalY,
+      piso: 1,
+      timestamp: DateTime.now(),
+    );
   }
 
   Offset _puntoEnSegmento(
@@ -335,6 +391,38 @@ class _BeaconState {
 
   double get promedio =>
       _ventana.isEmpty ? 0 : _ventana.reduce((a, b) => a + b) / _ventana.length;
+}
+
+/// Snapshot inmutable de la config de una baliza, cacheado para que el
+/// hot path de `_procesarLectura` no haga lookups asincrónicos al repo.
+class _ConfigBeaconCache {
+  final int minor;
+  final double x;
+  final double y;
+  final double? txPowerDbm;
+
+  const _ConfigBeaconCache({
+    required this.minor,
+    required this.x,
+    required this.y,
+    required this.txPowerDbm,
+  });
+}
+
+/// Snapshot inmutable de una arista con coordenadas pre-resueltas.
+/// Evita los lookups `id → Nodo` que antes se hacían en cada snap.
+class _AristaConNodos {
+  final double origenX;
+  final double origenY;
+  final double destinoX;
+  final double destinoY;
+
+  const _AristaConNodos({
+    required this.origenX,
+    required this.origenY,
+    required this.destinoX,
+    required this.destinoY,
+  });
 }
 
 /// Snapshot inmutable de la última lectura de una baliza.

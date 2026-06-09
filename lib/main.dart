@@ -14,6 +14,7 @@ import 'services/routing_service.dart';
 import 'services/simulated_ble_service.dart';
 import 'services/tts_service.dart';
 import 'ui/screens/calibracion_screen.dart';
+import 'ui/screens/explorar_screen.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/mapa_screen.dart';
 import 'ui/screens/search_screen.dart';
@@ -114,6 +115,16 @@ final _router = GoRouter(
       },
     ),
     GoRoute(
+      path: '/explorar',
+      builder: (_, _) => ExplorarScreen(
+        grafoRepository: _grafoRepository,
+        positioningService: _positioningService,
+        accesibleSoloRutasNotifier: accesibleSoloRutasNotifier,
+        modoSimulacionNotifier: modoSimulacionNotifier,
+        posicionVirtualNotifier: posicionVirtualNotifier,
+      ),
+    ),
+    GoRoute(
       path: '/settings',
       builder: (_, _) => SettingsScreen(
         darkModeNotifier: darkModeNotifier,
@@ -140,11 +151,13 @@ final _router = GoRouter(
 // ─── App ──────────────────────────────────────────────────────────────────────
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Cargar calibración inicial desde beacon_config.json antes de levantar
-  // la UI. Si falla, el notifier se queda con los defaults de
-  // CalibracionPositioning.defaults (definidos en beacon_config.dart).
+  // Cargar calibración + UUID desde beacon_config.json antes de levantar
+  // la UI. Si falla, los defaults aplican y el BleService usa el UUID
+  // histórico hardcoded.
   try {
     calibracionNotifier.value = await _beaconRepository.obtenerCalibracion();
+    final uuid = await _beaconRepository.obtenerUuid();
+    _bleServiceReal.configurarUuidObjetivo(uuid);
   } catch (_) {
     // Defaults ya están seteados — log opcional aquí en el futuro.
   }

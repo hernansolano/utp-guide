@@ -191,6 +191,7 @@ class SettingsScreen extends StatelessWidget {
             activeTab: 'settings',
             onTabChanged: (tab) {
               if (tab == 'home') context.go('/');
+              if (tab == 'map') context.push('/explorar');
               if (tab == 'search') context.push('/search');
             },
           ),
