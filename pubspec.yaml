@@ -21,12 +21,15 @@ dependencies:
   flutter_blue_plus: 1.36.8
   permission_handler: 11.4.0
   flutter_tts: 4.2.5
-  # flutter_beacon: usa Core Location en iOS (Apple bloquea iBeacons en
-  # Core Bluetooth, así que flutter_blue_plus no los ve en iPhone) y
-  # AltBeacon library en Android. Necesario para que iOS detecte
-  # iBeacons. En Android seguimos usando flutter_blue_plus para
-  # mantener el stream crudo de advertisements del diagnóstico.
-  flutter_beacon: 0.5.1
+  # dchs_flutter_beacon: fork mantenido de flutter_beacon (Eyro Labs).
+  # Usa Core Location en iOS (Apple bloquea iBeacons en Core Bluetooth,
+  # así que flutter_blue_plus no los ve en iPhone) y AltBeacon en
+  # Android. El original flutter_beacon 0.5.1 está abandonado (API v1
+  # de embedding, no compila en Flutter 3.x). En Android seguimos con
+  # flutter_blue_plus para mantener el diagnóstico de advertisements
+  # crudos. Auditado 2026-06-10: publisher verificado, sin llamadas de
+  # red en el código, Apache-2.0 (ADR-0009).
+  dchs_flutter_beacon: 0.6.8
 
 dev_dependencies:
   flutter_test:

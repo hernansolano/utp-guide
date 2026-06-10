@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
-import 'package:flutter_beacon/flutter_beacon.dart';
+// dchs_flutter_beacon es el fork mantenido de flutter_beacon (mismo API:
+// expone el global `flutterBeacon`, Region, RangingResult, etc.). El
+// original quedó abandonado en la API v1 de embedding y no compila en
+// Android con Flutter 3.x. Auditoría del fork: ver comentario en pubspec.yaml.
+import 'package:dchs_flutter_beacon/dchs_flutter_beacon.dart';
 import '../models/advertisement_crudo.dart';
 import '../models/beacon_reading.dart';
 import 'ble_service.dart' show BleEstado;
