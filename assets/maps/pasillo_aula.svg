@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pasillo + Aula de prueba — UTP-Guide piloto
+  Polycam scan 2026-06-10. Escala 100 px = 1 m (ADR-0006).
+
+  Pasillo : (0, 0) → (373, 1554)   3.73 × 15.54 m
+  Aula    : (373, 776) → (1170, 1554)  7.97 × 7.78 m
+  Puerta  : x = 373, y = 964..1054  (0.90 m)
+
+  Balizas (h 2.50 m):
+    1 (1.87, 0.00)   norte pasillo
+    2 (0.00, 7.77)   oeste pasillo
+    3 (1.87, 15.54)  sur pasillo
+    4 (11.70, 11.65) este aula
+    5 (7.72, 15.54)  sur aula
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1170 1554"
+     width="1170" height="1554">
+
+  <defs>
+    <clipPath id="piso">
+      <path d="M0 0 L373 0 L373 776 L1170 776 L1170 1554 L0 1554Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Zona no mapeada (edificio continúa) -->
+  <rect x="373" y="0" width="797" height="776" fill="#EDEAE3"/>
+
+  <!-- Suelo navegable -->
+  <path d="M0 0 L373 0 L373 776 L1170 776 L1170 1554 L0 1554Z"
+        fill="#F5F0E6"/>
+
+  <!-- Cuadrícula 1 m (recortada al suelo) -->
+  <g clip-path="url(#piso)" stroke="#D4CFC5" stroke-width="0.5" opacity="0.35">
+    <line x1="100"  y1="0" x2="100"  y2="1554"/>
+    <line x1="200"  y1="0" x2="200"  y2="1554"/>
+    <line x1="300"  y1="0" x2="300"  y2="1554"/>
+    <line x1="400"  y1="0" x2="400"  y2="1554"/>
+    <line x1="500"  y1="0" x2="500"  y2="1554"/>
+    <line x1="600"  y1="0" x2="600"  y2="1554"/>
+    <line x1="700"  y1="0" x2="700"  y2="1554"/>
+    <line x1="800"  y1="0" x2="800"  y2="1554"/>
+    <line x1="900"  y1="0" x2="900"  y2="1554"/>
+    <line x1="1000" y1="0" x2="1000" y2="1554"/>
+    <line x1="1100" y1="0" x2="1100" y2="1554"/>
+    <line x1="0" y1="100"  x2="1170" y2="100"/>
+    <line x1="0" y1="200"  x2="1170" y2="200"/>
+    <line x1="0" y1="300"  x2="1170" y2="300"/>
+    <line x1="0" y1="400"  x2="1170" y2="400"/>
+    <line x1="0" y1="500"  x2="1170" y2="500"/>
+    <line x1="0" y1="600"  x2="1170" y2="600"/>
+    <line x1="0" y1="700"  x2="1170" y2="700"/>
+    <line x1="0" y1="800"  x2="1170" y2="800"/>
+    <line x1="0" y1="900"  x2="1170" y2="900"/>
+    <line x1="0" y1="1000" x2="1170" y2="1000"/>
+    <line x1="0" y1="1100" x2="1170" y2="1100"/>
+    <line x1="0" y1="1200" x2="1170" y2="1200"/>
+    <line x1="0" y1="1300" x2="1170" y2="1300"/>
+    <line x1="0" y1="1400" x2="1170" y2="1400"/>
+    <line x1="0" y1="1500" x2="1170" y2="1500"/>
+  </g>
+
+  <!-- Paredes perimetrales (forma L) -->
+  <path d="M0 0 L373 0 L373 776 L1170 776 L1170 1554 L0 1554Z"
+        fill="none" stroke="#2C2C2C" stroke-width="12"
+        stroke-linejoin="miter" stroke-linecap="square"/>
+
+  <!-- Muro interior pasillo / aula con hueco de puerta -->
+  <g stroke="#2C2C2C" stroke-width="12" stroke-linecap="square">
+    <line x1="373" y1="776"  x2="373" y2="964"/>
+    <line x1="373" y1="1054" x2="373" y2="1554"/>
+  </g>
+
+  <!-- Jambas de puerta -->
+  <g stroke="#2C2C2C" stroke-width="3" stroke-linecap="round">
+    <line x1="364" y1="964"  x2="382" y2="964"/>
+    <line x1="364" y1="1054" x2="382" y2="1054"/>
+  </g>
+
+  <!-- Balizas BLE -->
+  <g id="beacons" font-family="sans-serif">
+    <!-- B-1 (1.87, 0.00) pared norte -->
+    <g transform="translate(187,8)">
+      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="0.8" opacity="0.25"/>
+      <circle r="10" fill="none" stroke="#1B4F72" stroke-width="1.0" opacity="0.45"/>
+      <circle r="5.5" fill="#1B4F72"/>
+      <text y="2.5" font-size="7" fill="white" text-anchor="middle" font-weight="700">1</text>
+    </g>
+    <!-- B-2 (0.00, 7.77) pared oeste -->
+    <g transform="translate(8,777)">
+      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="0.8" opacity="0.25"/>
+      <circle r="10" fill="none" stroke="#1B4F72" stroke-width="1.0" opacity="0.45"/>
+      <circle r="5.5" fill="#1B4F72"/>
+      <text y="2.5" font-size="7" fill="white" text-anchor="middle" font-weight="700">2</text>
+    </g>
+    <!-- B-3 (1.87, 15.54) pared sur pasillo -->
+    <g transform="translate(187,1546)">
+      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="0.8" opacity="0.25"/>
+      <circle r="10" fill="none" stroke="#1B4F72" stroke-width="1.0" opacity="0.45"/>
+      <circle r="5.5" fill="#1B4F72"/>
+      <text y="2.5" font-size="7" fill="white" text-anchor="middle" font-weight="700">3</text>
+    </g>
+    <!-- B-4 (11.70, 11.65) pared este aula -->
+    <g transform="translate(1162,1165)">
+      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="0.8" opacity="0.25"/>
+      <circle r="10" fill="none" stroke="#1B4F72" stroke-width="1.0" opacity="0.45"/>
+      <circle r="5.5" fill="#1B4F72"/>
+      <text y="2.5" font-size="7" fill="white" text-anchor="middle" font-weight="700">4</text>
+    </g>
+    <!-- B-5 (7.72, 15.54) pared sur aula -->
+    <g transform="translate(772,1546)">
+      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="0.8" opacity="0.25"/>
+      <circle r="10" fill="none" stroke="#1B4F72" stroke-width="1.0" opacity="0.45"/>
+      <circle r="5.5" fill="#1B4F72"/>
+      <text y="2.5" font-size="7" fill="white" text-anchor="middle" font-weight="700">5</text>
+    </g>
+  </g>
+
+</svg>

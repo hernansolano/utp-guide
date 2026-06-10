@@ -3,20 +3,26 @@
   "piso": 1,
   "edificio": "TEST",
   "origen_descripcion": "Esquina superior izquierda, en metros",
-  "mapa_svg": "assets/maps/aula_prueba.svg",
-  "mapa_ancho_metros": 8.04,
-  "mapa_alto_metros": 7.29,
+  "mapa_svg": "assets/maps/pasillo_aula.svg",
+  "mapa_ancho_metros": 11.70,
+  "mapa_alto_metros": 15.54,
   "nodos": [
-    {"id": "entrada",    "nombre": "Entrada del aula",    "tipo": "ENTRADA",      "x": 1.37, "y": 0.5,  "piso": 1, "accesible": true},
-    {"id": "centro",     "nombre": "Centro del aula",     "tipo": "INTERSECCION", "x": 4.02, "y": 3.65, "piso": 1, "accesible": true},
-    {"id": "escritorio", "nombre": "Escritorio profesor", "tipo": "SALON",        "x": 1.5,  "y": 1.5,  "piso": 1, "accesible": true},
-    {"id": "pizarra",    "nombre": "Pizarra",             "tipo": "SALON",        "x": 4.02, "y": 6.5,  "piso": 1, "accesible": true},
-    {"id": "proyector",  "nombre": "Proyector",           "tipo": "SALON",        "x": 6.5,  "y": 6.5,  "piso": 1, "accesible": true}
+    {"id": "entrada",        "nombre": "Entrada del pasillo", "tipo": "ENTRADA",      "x": 1.87, "y": 0.50,  "piso": 1, "accesible": true},
+    {"id": "pasillo_norte",  "nombre": "Pasillo (norte)",     "tipo": "INTERSECCION", "x": 1.87, "y": 5.00,  "piso": 1, "accesible": true},
+    {"id": "pasillo_sur",    "nombre": "Pasillo (sur)",       "tipo": "INTERSECCION", "x": 1.87, "y": 10.09, "piso": 1, "accesible": true},
+    {"id": "puerta_aula",    "nombre": "Puerta del aula",     "tipo": "INTERSECCION", "x": 3.73, "y": 10.09, "piso": 1, "accesible": true},
+    {"id": "aula_centro",    "nombre": "Centro del aula",     "tipo": "INTERSECCION", "x": 7.72, "y": 11.65, "piso": 1, "accesible": true},
+    {"id": "escritorio",     "nombre": "Escritorio profesor", "tipo": "SALON",        "x": 5.50, "y": 13.50, "piso": 1, "accesible": true},
+    {"id": "pizarra",        "nombre": "Pizarra",             "tipo": "SALON",        "x": 7.72, "y": 14.50, "piso": 1, "accesible": true},
+    {"id": "proyector",      "nombre": "Proyector",           "tipo": "SALON",        "x": 10.00,"y": 9.00,  "piso": 1, "accesible": true}
   ],
   "aristas": [
-    {"origenId": "entrada", "destinoId": "centro",     "distancia": 4.10, "tipoObstaculo": "NINGUNO", "accesible": true},
-    {"origenId": "centro",  "destinoId": "escritorio", "distancia": 3.31, "tipoObstaculo": "NINGUNO", "accesible": true},
-    {"origenId": "centro",  "destinoId": "pizarra",    "distancia": 2.85, "tipoObstaculo": "NINGUNO", "accesible": true},
-    {"origenId": "centro",  "destinoId": "proyector",  "distancia": 3.78, "tipoObstaculo": "NINGUNO", "accesible": true}
+    {"origenId": "entrada",       "destinoId": "pasillo_norte", "distancia": 4.50, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "pasillo_norte", "destinoId": "pasillo_sur",   "distancia": 5.09, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "pasillo_sur",   "destinoId": "puerta_aula",   "distancia": 1.86, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "puerta_aula",   "destinoId": "aula_centro",   "distancia": 4.28, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "aula_centro",   "destinoId": "escritorio",    "distancia": 2.89, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "aula_centro",   "destinoId": "pizarra",       "distancia": 2.85, "tipoObstaculo": "NINGUNO", "accesible": true},
+    {"origenId": "aula_centro",   "destinoId": "proyector",     "distancia": 3.50, "tipoObstaculo": "NINGUNO", "accesible": true}
   ]
 }

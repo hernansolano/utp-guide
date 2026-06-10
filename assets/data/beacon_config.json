@@ -3,7 +3,7 @@
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 1,
   "calibracion": {
-    "_descripcion": "Parámetros del modelo de path-loss para entornos interiores. Valores actuales calibrados para edificio con muros de concreto (FISC). Ver docs/positioning-ble.md y docs/adr/0002-parametros-path-loss.md.",
+    "_descripcion": "Parámetros del modelo de path-loss para entornos interiores con muros de concreto (FISC). Ver docs/adr/0002-parametros-path-loss.md.",
     "txPower_dbm_default": -65,
     "n_exponente_perdida": 3.5,
     "ventana_media_movil": 8,
@@ -11,8 +11,10 @@
     "expiracion_lectura_segundos": 3
   },
   "beacons": [
-    {"minor": 1, "x": 0.00, "y": 0.50, "txPower_dbm": -65, "descripcion": "Pared oeste · norte (h 2.50 m)"},
-    {"minor": 2, "x": 8.04, "y": 0.50, "txPower_dbm": -65, "descripcion": "Pared este · norte (h 2.50 m)"},
-    {"minor": 3, "x": 4.02, "y": 7.29, "txPower_dbm": -65, "descripcion": "Pared sur · centro (h 2.50 m)"}
+    {"minor": 1, "x": 1.87,  "y": 0.00,  "txPower_dbm": -65, "descripcion": "Pasillo · norte (h 2.50 m)"},
+    {"minor": 2, "x": 0.00,  "y": 7.77,  "txPower_dbm": -65, "descripcion": "Pasillo · oeste centro (h 2.50 m)"},
+    {"minor": 3, "x": 1.87,  "y": 15.54, "txPower_dbm": -65, "descripcion": "Pasillo · sur (h 2.50 m)"},
+    {"minor": 4, "x": 11.70, "y": 11.65, "txPower_dbm": -65, "descripcion": "Aula · este centro (h 2.50 m)"},
+    {"minor": 5, "x": 7.72,  "y": 15.54, "txPower_dbm": -65, "descripcion": "Aula · sur centro (h 2.50 m)"}
   ]
 }
