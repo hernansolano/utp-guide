@@ -261,6 +261,13 @@ class PositioningService {
   /// — toda la información (txPower, posición de balizas, grafo) está en
   /// memoria gracias a [_precargarBeacons] y [_precargarGrafo].
   void _procesarLectura(BeaconReading lectura) {
+    // Guard de sanidad: un RSSI >= -20 dBm no es físicamente plausible
+    // (ni tocando la antena). iOS reporta rssi=0 cuando la medición
+    // falla; si entrara al path-loss daría distancia ~1 cm y el peso
+    // 1/d² del centroide dispararía la posición hacia esa baliza. La
+    // fuente iOS ya filtra, esto cubre cualquier otra fuente futura.
+    if (lectura.rssi >= -20.0) return;
+
     // 1. Modelo de path-loss → distancia
     final txPower = _txPowerSync(lectura.minor);
     final distancia = pow(10.0,

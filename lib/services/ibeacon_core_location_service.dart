@@ -215,11 +215,41 @@ class IbeaconCoreLocationService implements BleSource {
 
   // ─── Procesamiento de ranging ─────────────────────────────────────────────
 
+  /// RSSI máximo físicamente plausible. CLBeacon reporta `rssi = 0`
+  /// cuando la medición falló (frecuente en iOS 13+ — la "intermitencia"
+  /// conocida), y el modelo Dart del plugin convierte null en -1. Si
+  /// esos valores entraran al path-loss, la distancia daría ~1 cm y el
+  /// peso 1/d² del centroide haría saltar la posición a esa baliza.
+  /// Incluso tocando la antena, un RSSI real ronda -30 dBm; todo lo
+  /// mayor a -20 es basura de medición y se descarta.
+  static const double _rssiMaxPlausible = -20.0;
+
   /// Cada vez que iOS reporta una región rangeada, recibimos 0..N
   /// `Beacon`s con su distancia estimada. Los convertimos a
-  /// [BeaconReading] y los emitimos por los streams.
+  /// [BeaconReading] y los emitimos por los streams. Las mediciones
+  /// inválidas (rssi=0/-1) se filtran acá — son el síntoma de la
+  /// intermitencia de ranging de iOS 13+, no lecturas reales.
   void _onRangingResult(RangingResult result) {
     for (final b in result.beacons) {
+      if (b.rssi >= _rssiMaxPlausible) {
+        // Medición inválida: reportar al diagnóstico (no al pipeline).
+        if (kDebugMode && !_crudoController.isClosed) {
+          _crudoController.add(AdvertisementCrudo(
+            deviceId: 'ios:${b.major}.${b.minor}',
+            rssi: b.rssi.toDouble(),
+            formato: FormatoBalizaBle.iBeacon,
+            uuid: b.proximityUUID.toLowerCase(),
+            major: b.major,
+            minor: b.minor,
+            aceptado: false,
+            timestamp: DateTime.now(),
+            motivoDescarte:
+                'RSSI inválido (${b.rssi}) · medición fallida de iOS',
+          ));
+        }
+        continue;
+      }
+
       final reading = BeaconReading(
         minor: b.minor,
         major: b.major,
