@@ -100,6 +100,18 @@ class _MapaScreenState extends State<MapaScreen> {
   /// inmediato, este token cubre escenarios futuros).
   int _tokenRecalculo = 0;
 
+  /// Nodo de origen actual de la ruta. `null` hasta tener la primera
+  /// posición BLE → la ruta arranca desde la entrada como fallback. Una
+  /// vez que llega posición, se setea al nodo más cercano al usuario y la
+  /// ruta se re-enruta desde ahí.
+  String? _origenActualId;
+
+  /// Throttle del re-enrutado: el nodo más cercano se chequea como mucho
+  /// cada [_msEntreChequeosOrigen] ms (las lecturas llegan a 6-10 Hz, no
+  /// queremos recomputar A* en cada una).
+  DateTime _ultimoChequeoOrigen = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _msEntreChequeosOrigen = 600;
+
   StreamSubscription<AccelerometerEvent>? _acelerometroSub;
   StreamSubscription<Position?>? _posicionSub;
   StreamSubscription<BleEstado>? _estadoBleSub;
@@ -128,37 +140,18 @@ class _MapaScreenState extends State<MapaScreen> {
 
   Future<void> _cargarRutaYDimensiones() async {
     try {
-      final futureDims = widget.grafoRepository.obtenerDimensionesMapa();
-      final futureSvg = widget.grafoRepository.obtenerMapaSvgPath();
-      final futureEntradas =
-          widget.routingService.nodosPorTipo(TipoNodo.entrada);
+      final dims = await widget.grafoRepository.obtenerDimensionesMapa();
+      final svgPath = await widget.grafoRepository.obtenerMapaSvgPath();
+      if (!mounted) return;
+      setState(() {
+        _mapaSize = Size(dims.anchoMetros, dims.altoMetros);
+        _svgPath = svgPath;
+      });
 
-      final dims = await futureDims;
-      final svgPath = await futureSvg;
-      final entradas = await futureEntradas;
-      if (entradas.isEmpty) throw Exception('Sin nodo de entrada');
-
-      final ruta = await widget.routingService.calcularRuta(
-        origenId: entradas.first.id,
-        destinoId: widget.destinoId,
-        perfil: _perfilActual,
-      );
-
-      if (mounted) {
-        setState(() {
-          _mapaSize = Size(dims.anchoMetros, dims.altoMetros);
-          _svgPath = svgPath;
-          _ruta = ruta;
-          _pasos = PasoNavegacion.generarDesdeRuta(ruta);
-          _pasoActualIndice = 0;
-          _cargando = false;
-        });
-        // Tras el primer frame, encuadrar la ruta automáticamente — UX
-        // estilo Google Maps que muestra el destino completo al inicio.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _mapController.encuadrarRuta();
-        });
-      }
+      // Primera ruta: desde la entrada (aún no hay posición BLE). Cuando
+      // llegue la primera lectura, el listener re-enruta desde el usuario.
+      await _recalcularRuta(perfil: _perfilActual, encuadrar: true);
+      if (mounted) setState(() => _cargando = false);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -169,41 +162,67 @@ class _MapaScreenState extends State<MapaScreen> {
     }
   }
 
+  /// Recalcula la ruta desde el origen actual (`_origenActualId`, o la
+  /// primera entrada como fallback) hasta el destino, con el [perfil] dado.
+  ///
+  /// Usa `_tokenRecalculo` para descartar resultados obsoletos si otro
+  /// recálculo arranca mientras este espera. Lanza si no hay ruta — cada
+  /// llamador decide cómo reportarlo (pantalla de error en la carga
+  /// inicial, snackbar en el toggle de perfil, silencio en el re-enrutado
+  /// por posición).
+  Future<void> _recalcularRuta({
+    required PerfilMovilidad perfil,
+    bool encuadrar = false,
+  }) async {
+    final tokenLocal = ++_tokenRecalculo;
+
+    var origenId = _origenActualId;
+    if (origenId == null) {
+      final entradas =
+          await widget.routingService.nodosPorTipo(TipoNodo.entrada);
+      if (!mounted || tokenLocal != _tokenRecalculo) return;
+      if (entradas.isEmpty) throw Exception('Sin nodo de entrada');
+      origenId = entradas.first.id;
+    }
+
+    final ruta = await widget.routingService.calcularRuta(
+      origenId: origenId,
+      destinoId: widget.destinoId,
+      perfil: perfil,
+    );
+    if (!mounted || tokenLocal != _tokenRecalculo) return;
+
+    setState(() {
+      _perfilActual = perfil;
+      _ruta = ruta;
+      _pasos = PasoNavegacion.generarDesdeRuta(ruta);
+      _pasoActualIndice = 0;
+    });
+
+    if (encuadrar) {
+      // Solo en carga inicial y toggle de perfil — no al re-enrutar por
+      // posición (no queremos saltos de cámara mientras el usuario camina).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _mapController.encuadrarRuta();
+      });
+    }
+  }
+
   Future<void> _alternarPerfilMovilidad() async {
     if (_recalculandoRuta) return;
     final nuevoPerfil = _perfilActual == PerfilMovilidad.estandar
         ? PerfilMovilidad.accesible
         : PerfilMovilidad.estandar;
 
-    // Token local: si otro recálculo arranca después, este queda obsoleto.
-    final tokenLocal = ++_tokenRecalculo;
     setState(() => _recalculandoRuta = true);
     try {
-      final entradas =
-          await widget.routingService.nodosPorTipo(TipoNodo.entrada);
-      // Si llegó un recálculo más nuevo, descartar este resultado.
-      if (!mounted || tokenLocal != _tokenRecalculo) return;
-
-      final nuevaRuta = await widget.routingService.calcularRuta(
-        origenId: entradas.first.id,
-        destinoId: widget.destinoId,
-        perfil: nuevoPerfil,
-      );
-      if (!mounted || tokenLocal != _tokenRecalculo) return;
-
-      setState(() {
-        _perfilActual = nuevoPerfil;
-        _ruta = nuevaRuta;
-        _pasos = PasoNavegacion.generarDesdeRuta(nuevaRuta);
-        _pasoActualIndice = 0;
-        _recalculandoRuta = false;
-      });
-      // Re-encuadrar la nueva ruta.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _mapController.encuadrarRuta();
-      });
+      // Re-enruta con el mismo origen actual (posición o entrada) pero el
+      // nuevo perfil. Si falla (sin ruta accesible), `_recalcularRuta`
+      // lanza sin tocar `_perfilActual` → se conserva la ruta anterior.
+      await _recalcularRuta(perfil: nuevoPerfil, encuadrar: true);
+      if (mounted) setState(() => _recalculandoRuta = false);
     } catch (e) {
-      if (!mounted || tokenLocal != _tokenRecalculo) return;
+      if (!mounted) return;
       setState(() => _recalculandoRuta = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -266,6 +285,9 @@ class _MapaScreenState extends State<MapaScreen> {
       _beaconsActivosNotifier.value =
           widget.positioningService.beaconsActivos;
 
+      // Re-enrutar desde la posición real del usuario (throttled).
+      _quizasReenrutar(pos);
+
       // El paso actual cambia con baja frecuencia (al cruzar un nodo).
       // Solo setState cuando realmente cambia, para que la navigation
       // card se actualice sin rebuild en cada lectura.
@@ -281,6 +303,34 @@ class _MapaScreenState extends State<MapaScreen> {
     });
 
     widget.positioningService.iniciar();
+  }
+
+  /// Si pasó suficiente tiempo desde el último chequeo, busca el nodo más
+  /// cercano a la posición y re-enruta si el origen cambió. Throttled para
+  /// no recomputar A* en cada lectura BLE (6-10 Hz).
+  void _quizasReenrutar(Position? pos) {
+    if (pos == null) return;
+    final ahora = DateTime.now();
+    if (ahora.difference(_ultimoChequeoOrigen).inMilliseconds <
+        _msEntreChequeosOrigen) {
+      return;
+    }
+    _ultimoChequeoOrigen = ahora;
+    _actualizarOrigenSiCambio(pos);
+  }
+
+  /// Resuelve el nodo del grafo más cercano a [pos]; si difiere del origen
+  /// vigente, lo actualiza y re-enruta desde ahí (sin re-encuadrar). Fire-
+  /// and-forget: el token de `_recalcularRuta` descarta resultados viejos.
+  Future<void> _actualizarOrigenSiCambio(Position pos) async {
+    final nodo = await widget.routingService.nodoMasCercano(pos.x, pos.y);
+    if (!mounted || nodo.id == _origenActualId) return;
+    _origenActualId = nodo.id;
+    try {
+      await _recalcularRuta(perfil: _perfilActual);
+    } catch (_) {
+      // Grafo conexo: no debería fallar. Si pasa, conservamos la ruta.
+    }
   }
 
   Future<void> _mostrarDialogoBleSiAplica() async {
@@ -666,11 +716,16 @@ class _MapaScreenState extends State<MapaScreen> {
                       return Positioned(
                         top: MediaQuery.of(context).padding.top + 80,
                         left: 16,
-                        child: ValueListenableBuilder<Position?>(
-                          valueListenable: _posicionUsuarioNotifier,
-                          builder: (_, pos, _) => _DebugOverlay(
-                            positioningService: widget.positioningService,
-                            posicionSnapped: pos,
+                        // IgnorePointer: el cuadro es informativo. Sin
+                        // esto, su fondo opaco capturaba pans/taps en la
+                        // esquina y "rompía" el mapa en pantallas chicas.
+                        child: IgnorePointer(
+                          child: ValueListenableBuilder<Position?>(
+                            valueListenable: _posicionUsuarioNotifier,
+                            builder: (_, pos, _) => _DebugOverlay(
+                              positioningService: widget.positioningService,
+                              posicionSnapped: pos,
+                            ),
                           ),
                         ),
                       );

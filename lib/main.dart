@@ -1,5 +1,4 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'data/repositories/beacon_repository.dart';
@@ -38,7 +37,12 @@ final accesibleSoloRutasNotifier    = ValueNotifier<bool>(false);
 final vozHabilitadaNotifier         = ValueNotifier<bool>(false);
 final textoGrandeNotifier           = ValueNotifier<bool>(false);
 final arAutomaticoNotifier          = ValueNotifier<bool>(true);
-final debugOverlayNotifier          = ValueNotifier<bool>(kDebugMode);
+
+/// Overlay de debug sobre el mapa (RSSI, balizas, coords cruda/snap).
+/// Default `false`: UI limpia al abrir en cualquier build. El dev lo
+/// enciende cuando lo necesita desde Ajustes → Desarrollador. El cuadro
+/// nunca captura gestos (va envuelto en `IgnorePointer` en MapaScreen).
+final debugOverlayNotifier          = ValueNotifier<bool>(false);
 
 /// Si false, `PositioningService` no aplica snap-to-graph y emite la
 /// posición cruda del centroide ponderado. Útil para calibrar: ver el
@@ -48,7 +52,7 @@ final snapHabilitadoNotifier        = ValueNotifier<bool>(true);
 
 /// Cuando true, [TrazaService] acumula cada posición emitida en una
 /// polilínea visible sobre el mapa. Útil para ver el trayecto que el
-/// sistema marca mientras te movés, y compararlo con la realidad.
+/// sistema marca mientras te mueves, y compararlo con la realidad.
 final trazaActivaNotifier           = ValueNotifier<bool>(false);
 
 /// Si true, el sistema usa el simulador BLE en lugar del escaneo real.

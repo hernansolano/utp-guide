@@ -14,7 +14,7 @@ import 'positioning_service.dart';
 /// preocuparse por OOM.
 ///
 /// **Uso típico:** activar desde un botón en el debug overlay,
-/// caminar el trayecto que querés evaluar, desactivar, mirar la
+/// caminar el trayecto que quieres evaluar, desactivar, mirar la
 /// polilínea sobre el mapa. "Limpiar" resetea la captura.
 class TrazaService {
   static const int _maxPuntos = 500;

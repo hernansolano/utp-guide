@@ -174,6 +174,15 @@ class MapaPainter extends CustomPainter {
       _paintPois(canvas, size);
     }
 
+    // Conector dot→ruta: une la posición del usuario con el primer nodo
+    // de la ruta para que la línea "empiece donde estoy" en vez de en un
+    // nodo fijo. Misma línea punteada que el resto de la ruta.
+    if (posicionUsuario != null && ruta.isNotEmpty) {
+      final pu = _toScreen(posicionUsuario!.x, posicionUsuario!.y, size);
+      final primer = _toScreen(ruta.first.x, ruta.first.y, size);
+      _drawDashedLine(canvas, pu, primer, _paintLinea);
+    }
+
     // Línea punteada entre nodos consecutivos
     for (int i = 0; i < ruta.length - 1; i++) {
       final a = _toScreen(ruta[i].x, ruta[i].y, size);

@@ -54,7 +54,7 @@ class BeaconRepository {
   ///
   /// Lanza [BeaconNotFoundException] si no existe en el archivo.
   Future<ConfigBeacon> obtenerConfigBeacon(int minor) async {
-    final beacons = await _obtenerTodosLosBeacons();
+    final beacons = await obtenerTodosLosBeacons();
     final match = beacons.where((b) => b.minor == minor).firstOrNull;
     if (match == null) throw BeaconNotFoundException(minor);
     return match;
@@ -105,7 +105,7 @@ class BeaconRepository {
   /// Útil para validar en logs que las balizas detectadas estén en el
   /// catálogo, y para herramientas de debugging.
   Future<List<int>> obtenerMinorsRegistrados() async {
-    final beacons = await _obtenerTodosLosBeacons();
+    final beacons = await obtenerTodosLosBeacons();
     return beacons.map((b) => b.minor).toList();
   }
 
@@ -119,7 +119,19 @@ class BeaconRepository {
     return data['uuid'] as String;
   }
 
-  Future<List<ConfigBeacon>> _obtenerTodosLosBeacons() async {
+  /// `major` iBeacon del proyecto (en el piloto = piso), leído del campo
+  /// `major` de `beacon_config.json`. Necesario para reconstruir el
+  /// archivo completo desde la pantalla de calibración.
+  Future<int> obtenerMajor() async {
+    final data = await _load();
+    return data['major'] as int;
+  }
+
+  /// Lista completa de balizas registradas (con x/y/txPower/descripcion).
+  ///
+  /// Lee del cache ya cargado. La usa la pantalla de calibración para
+  /// generar el `beacon_config.json` completo listo para pegar.
+  Future<List<ConfigBeacon>> obtenerTodosLosBeacons() async {
     if (_cachedBeacons != null) return _cachedBeacons!;
     final data = await _load();
     final list = data['beacons'] as List<dynamic>;

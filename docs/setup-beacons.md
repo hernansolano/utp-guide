@@ -89,8 +89,8 @@ Una vez instaladas, registrar todas las balizas en `assets/data/beacon_config.js
 Desde la versión actual, el procedimiento de campo se hace dentro de la app. Abrir Ajustes → Desarrollador → "Calibración BLE (campo)". Ahí:
 
 1. **Stats en vivo:** cada baliza detectada muestra RSSI actual y promedio sobre N muestras, con desviación estándar y distancia calculada usando la calibración vigente.
-2. **Herramienta "Distancia conocida":** ingresá la distancia real desde donde estás parado y la app sugiere qué valor de `n` o `txPower` haría que el cálculo coincida con la realidad.
-3. **Sliders en vivo:** mové `n`, ventana de media móvil y tolerancia de snap para ver el efecto inmediatamente. Cuando los valores se sientan bien, copiá el bloque JSON sugerido en la sección "Aplicar permanentemente" y pegalo en `assets/data/beacon_config.json`.
+2. **Herramienta "Distancia conocida":** ingresa la distancia real desde donde estás parado y la app sugiere qué valor de `n` o `txPower` haría que el cálculo coincida con la realidad.
+3. **Sliders en vivo:** mueve `n`, ventana de media móvil y tolerancia de snap para ver el efecto inmediatamente. Cuando los valores se sientan bien, copia el bloque JSON sugerido en la sección "Aplicar permanentemente" y pégalo en `assets/data/beacon_config.json`.
 4. **Export CSV:** botón de copia al portapapeles que produce un CSV listo para pegar en Sheets/Excel.
 
 La pantalla solo aparece en builds de debug (`kDebugMode`). En release no es accesible.

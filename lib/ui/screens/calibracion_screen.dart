@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -65,8 +66,22 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
   final Map<int, BeaconStats> _stats = {};
 
   /// txPower por baliza, cacheado de `beacon_config.json` para no hacer
-  /// I/O por cada lectura.
+  /// I/O por cada lectura. Incluye los overrides aplicados en vivo, así
+  /// el cálculo de distancia de esta pantalla refleja la calibración.
   final Map<int, double> _txPowerPorMinor = {};
+
+  /// txPower que el usuario aplicó manualmente por baliza desde la
+  /// herramienta "Distancia conocida". Solo estos se escriben como
+  /// `txPower_dbm` en el archivo generado; el resto conserva su valor
+  /// original. Vacío = ninguna baliza recalibrada todavía.
+  final Map<int, double> _txPowerOverrides = {};
+
+  /// Config completa de las balizas (x/y/descripcion), uuid y major,
+  /// leídos al abrir. Necesarios para reconstruir el `beacon_config.json`
+  /// completo en la sección "Aplicar permanentemente".
+  List<ConfigBeacon> _beaconsConfig = const [];
+  String? _uuid;
+  int? _major;
 
   /// Valor de calibración como vino del archivo, para poder restaurarlo.
   late CalibracionPositioning _calibracionOriginal;
@@ -155,24 +170,25 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
 
   Future<void> _cargarConfigs() async {
     final cal = await widget.beaconRepository.obtenerCalibracion();
-    final minors = await widget.beaconRepository.obtenerMinorsRegistrados();
-    for (final m in minors) {
-      try {
-        final config = await widget.beaconRepository.obtenerConfigBeacon(m);
-        _stats.putIfAbsent(
-          m,
-          () => BeaconStats(minor: m, descripcion: config.descripcion),
-        );
-        _txPowerPorMinor[m] = config.txPowerDbm ?? cal.txPowerDbmDefault;
-      } catch (_) {
-        // ignore
-      }
+    final beacons = await widget.beaconRepository.obtenerTodosLosBeacons();
+    final uuid = await widget.beaconRepository.obtenerUuid();
+    final major = await widget.beaconRepository.obtenerMajor();
+    for (final config in beacons) {
+      _stats.putIfAbsent(
+        config.minor,
+        () => BeaconStats(minor: config.minor, descripcion: config.descripcion),
+      );
+      _txPowerPorMinor[config.minor] =
+          config.txPowerDbm ?? cal.txPowerDbmDefault;
     }
     // Cargar mapa para la sección de validación end-to-end.
     final dims = await widget.grafoRepository.obtenerDimensionesMapa();
     final svg = await widget.grafoRepository.obtenerMapaSvgPath();
     if (mounted) {
       setState(() {
+        _beaconsConfig = beacons;
+        _uuid = uuid;
+        _major = major;
         _dimensionesMapa = Size(dims.anchoMetros, dims.altoMetros);
         _svgPath = svg;
       });
@@ -318,6 +334,80 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     widget.calibracionNotifier.value = nueva;
   }
 
+  /// Aplica el txPower sugerido a una baliza: lo guarda como override
+  /// (para el archivo generado) y actualiza el cache vivo para que el
+  /// cálculo de distancia de esta pantalla lo refleje de inmediato. No
+  /// toca el PositioningService — el efecto en el dot real llega al pegar
+  /// el archivo y reiniciar.
+  void _aplicarTxPower(int minor, double txPower) {
+    setState(() {
+      _txPowerOverrides[minor] = txPower;
+      _txPowerPorMinor[minor] = txPower;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('txPower de Minor $minor → '
+            '${txPower.toStringAsFixed(1)} dBm · afinando…'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Redondea a [decimales] y devuelve `int` cuando el resultado es
+  /// entero, para que el JSON muestre `-65` en vez de `-65.0`.
+  num _numLimpio(double v, int decimales) {
+    final r = double.parse(v.toStringAsFixed(decimales));
+    return r == r.roundToDouble() ? r.toInt() : r;
+  }
+
+  /// Genera el `beacon_config.json` **completo** listo para pegar: uuid,
+  /// major, bloque de calibración (valores vivos) y todas las balizas con
+  /// su txPower calibrado (override si se aplicó, original si no).
+  String _generarConfigCompleto() {
+    final cal = widget.calibracionNotifier.value;
+    final mapa = <String, dynamic>{
+      '_descripcion':
+          'Configuración de balizas BLE y parámetros de calibración del '
+              'posicionamiento. Editar en campo no requiere recompilar la app.',
+      'uuid': _uuid ?? '',
+      'major': _major ?? 1,
+      'calibracion': {
+        'txPower_dbm_default': _numLimpio(cal.txPowerDbmDefault, 0),
+        'n_exponente_perdida': _numLimpio(cal.nExponentePerdida, 2),
+        'ventana_media_movil': cal.ventanaMediaMovil,
+        'tolerancia_snap_metros': _numLimpio(cal.toleranciaSnapMetros, 1),
+        'expiracion_lectura_segundos': cal.expiracionLecturaSegundos,
+      },
+      'beacons': [
+        for (final b in _beaconsConfig)
+          {
+            'minor': b.minor,
+            'x': _numLimpio(b.x, 2),
+            'y': _numLimpio(b.y, 2),
+            'txPower_dbm': _numLimpio(
+              _txPowerOverrides[b.minor] ?? b.txPowerDbm ?? cal.txPowerDbmDefault,
+              1,
+            ),
+            'descripcion': b.descripcion,
+          },
+      ],
+    };
+    return const JsonEncoder.withIndent('  ').convert(mapa);
+  }
+
+  /// Fragmento de solo calibración — atajo para cambios rápidos sin
+  /// reemplazar todo el archivo.
+  String _generarSoloCalibracion() {
+    final cal = widget.calibracionNotifier.value;
+    return '"calibracion": {\n'
+        '  "txPower_dbm_default": ${cal.txPowerDbmDefault.toStringAsFixed(0)},\n'
+        '  "n_exponente_perdida": ${cal.nExponentePerdida.toStringAsFixed(2)},\n'
+        '  "ventana_media_movil": ${cal.ventanaMediaMovil},\n'
+        '  "tolerancia_snap_metros": ${cal.toleranciaSnapMetros.toStringAsFixed(1)},\n'
+        '  "expiracion_lectura_segundos": ${cal.expiracionLecturaSegundos}\n'
+        '}';
+  }
+
   /// Calcula `n` que haría que la distancia medida coincida con la real.
   /// Fórmula despejada de path-loss: n = (txPower - rssi) / (10 · log10(d))
   double? _calcularNSugerido() {
@@ -366,7 +456,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: colors.surface,
         title: Text(
-          esPermisos ? 'Activá los permisos' : 'Activá el Bluetooth',
+          esPermisos ? 'Activa los permisos' : 'Activa el Bluetooth',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -376,10 +466,10 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
         content: Text(
           esPermisos
               ? 'La calibración necesita acceso a Bluetooth para recibir '
-                  'lecturas de las balizas. Tocá "Reintentar" para volver '
-                  'a pedirlos, o activalos en Ajustes del sistema → Apps → '
+                  'lecturas de las balizas. Toca "Reintentar" para volver '
+                  'a pedirlos, o actívalos en Ajustes del sistema → Apps → '
                   'UTP Guide → Permisos.'
-              : 'El Bluetooth de tu dispositivo está apagado. Activalo '
+              : 'El Bluetooth de tu dispositivo está apagado. Actívalo '
                   'desde el panel de control rápido para empezar a recibir '
                   'lecturas.',
           style: GoogleFonts.plusJakartaSans(
@@ -400,7 +490,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                   SnackBar(
                     content: Text(ok
                         ? 'Permisos concedidos · escaneando…'
-                        : 'Permisos siguen denegados · revisá Ajustes del sistema'),
+                        : 'Permisos siguen denegados · revisa Ajustes del sistema'),
                     duration: const Duration(seconds: 3),
                   ),
                 );
@@ -544,11 +634,11 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
         color = colors.brand;
         icono = Icons.science_outlined;
       case BleEstado.bluetoothApagado:
-        mensaje = 'Bluetooth apagado · activalo para recibir lecturas';
+        mensaje = 'Bluetooth apagado · actívalo para recibir lecturas';
         color = colors.danger;
         icono = Icons.bluetooth_disabled_rounded;
       case BleEstado.permisosNegados:
-        mensaje = 'Permisos BLE negados · revisá Ajustes del sistema';
+        mensaje = 'Permisos BLE negados · revisa Ajustes del sistema';
         color = colors.danger;
         icono = Icons.lock_outline_rounded;
       default:
@@ -592,7 +682,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
       title: 'Diagnóstico BLE',
       subtitle: items.isEmpty
           ? 'Sin paquetes recibidos · si tu simulador está activo, '
-              'revisá Bluetooth y permisos'
+              'revisa Bluetooth y permisos'
           : '${items.length} dispositivos · $aceptados aceptados · '
               '$descartados descartados',
       child: Column(
@@ -612,7 +702,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                   SnackBar(
                     content: Text(ok
                         ? 'Permisos OK · escaneando'
-                        : 'Permisos siguen denegados · revisá Ajustes del sistema'),
+                        : 'Permisos siguen denegados · revisa Ajustes del sistema'),
                     duration: const Duration(seconds: 3),
                   ),
                 );
@@ -686,7 +776,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                 titulo: 'Capturar traza',
                 detalle: trazaOn
                     ? 'Acumulando posiciones · $cantidad puntos'
-                    : 'OFF — activá para empezar a dibujar el trayecto.',
+                    : 'OFF — actívalo para empezar a dibujar el trayecto.',
                 value: trazaOn,
                 onChanged: (v) => widget.trazaActivaNotifier.value = v,
               ),
@@ -733,7 +823,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     return _Card(
       title: 'Validación de posición',
       subtitle:
-          'Tocá el mapa donde estás parado de verdad. La app compara contra '
+          'Toca el mapa donde estás parado de verdad. La app compara contra '
           'su posición calculada y mide el error real en metros.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,7 +858,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
 
           if (_posicionReal == null)
             Text(
-              'Tocá tu posición real en el mapa para empezar a medir.',
+              'Toca tu posición real en el mapa para empezar a medir.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 color: colors.fgMuted,
@@ -800,7 +890,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Sobre ${_errorStats.samples} muestras (mantené la posición):',
+                'Sobre ${_errorStats.samples} muestras (mantén la posición):',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -884,7 +974,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
 
     return _Card(
       title: 'Distancia conocida',
-      subtitle: 'Calculá qué valores harían que la app coincida con la realidad',
+      subtitle: 'Calcula qué valores harían que la app coincida con la realidad',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -932,7 +1022,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
           // Resultado
           if (stats == null || !stats.tieneMuestras)
             Text(
-              'Seleccioná una baliza con lecturas para calcular sugerencias.',
+              'Selecciona una baliza con lecturas para calcular sugerencias.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 color: colors.fgMuted,
@@ -940,7 +1030,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
             )
           else if (distReal == null || distReal <= 0)
             Text(
-              'Ingresá una distancia real válida.',
+              'Ingresa una distancia real válida.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 color: colors.fgMuted,
@@ -978,7 +1068,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                 if (distReal == 1.0)
                   Text(
                     'A 1 m, RSSI medido = txPower por definición. '
-                    'Ajustá el txPower de esta baliza al RSSI medio: '
+                    'Ajusta el txPower de esta baliza al RSSI medio: '
                     '${stats.rssiMean.toStringAsFixed(1)} dBm.',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
@@ -1005,6 +1095,33 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
                         txPowerSugerido?.toStringAsFixed(1) ?? '—',
                     explicacion: 'solo afecta a esta baliza',
                   ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: txPowerSugerido == null
+                          ? null
+                          : () => _aplicarTxPower(stats.minor, txPowerSugerido),
+                      icon: const Icon(Icons.check_rounded, size: 16),
+                      label: Text(
+                        'Aplicar txPower a Minor ${stats.minor}',
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  if (_txPowerOverrides.containsKey(stats.minor))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        '✓ Aplicado: ${_txPowerOverrides[stats.minor]!.toStringAsFixed(1)} dBm '
+                        '· queda en el archivo generado abajo',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: colors.success,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                 ],
               ],
             ),
@@ -1126,61 +1243,89 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
   }
 
   Widget _buildSeccionValoresJson(BuildContext context, AppColors colors) {
-    final cal = widget.calibracionNotifier.value;
+    final cargando = _uuid == null || _beaconsConfig.isEmpty;
+    final overrides = _txPowerOverrides.length;
+    final subtitulo = cargando
+        ? 'Cargando configuración…'
+        : overrides == 0
+            ? 'Reemplaza todo assets/data/beacon_config.json con esto.'
+            : 'Reemplaza todo assets/data/beacon_config.json · '
+                '$overrides ${overrides == 1 ? "baliza recalibrada" : "balizas recalibradas"}.';
+
     return _Card(
       title: 'Aplicar permanentemente',
-      subtitle: 'Pegá estos valores en assets/data/beacon_config.json',
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colors.bgMuted,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SelectableText(
-              '"calibracion": {\n'
-              '  "txPower_dbm_default": ${cal.txPowerDbmDefault.toStringAsFixed(0)},\n'
-              '  "n_exponente_perdida": ${cal.nExponentePerdida.toStringAsFixed(2)},\n'
-              '  "ventana_media_movil": ${cal.ventanaMediaMovil},\n'
-              '  "tolerancia_snap_metros": ${cal.toleranciaSnapMetros.toStringAsFixed(1)},\n'
-              '  "expiracion_lectura_segundos": ${cal.expiracionLecturaSegundos}\n'
-              '}',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text:
-                    '"calibracion": {\n'
-                    '  "txPower_dbm_default": ${cal.txPowerDbmDefault.toStringAsFixed(0)},\n'
-                    '  "n_exponente_perdida": ${cal.nExponentePerdida.toStringAsFixed(2)},\n'
-                    '  "ventana_media_movil": ${cal.ventanaMediaMovil},\n'
-                    '  "tolerancia_snap_metros": ${cal.toleranciaSnapMetros.toStringAsFixed(1)},\n'
-                    '  "expiracion_lectura_segundos": ${cal.expiracionLecturaSegundos}\n'
-                    '}'));
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Bloque copiado al portapapeles'),
-                    duration: Duration(seconds: 2),
+      subtitle: subtitulo,
+      child: cargando
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.bgMuted,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                );
-              },
-              icon: const Icon(Icons.copy_rounded, size: 16),
-              label: Text(
-                'Copiar bloque',
-                style: GoogleFonts.plusJakartaSans(fontSize: 12),
-              ),
+                  child: SelectableText(
+                    _generarConfigCompleto(),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Clipboard.setData(
+                              ClipboardData(text: _generarConfigCompleto()));
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Archivo completo copiado · '
+                                  'pégalo en beacon_config.json y reinicia'),
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.description_rounded, size: 16),
+                        label: Text(
+                          'Copiar archivo completo',
+                          style: GoogleFonts.plusJakartaSans(fontSize: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(
+                            ClipboardData(text: _generarSoloCalibracion()));
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Solo el bloque de calibración copiado'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.tune_rounded, size: 16),
+                      label: Text(
+                        'Solo calibración',
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
     );
   }
 }

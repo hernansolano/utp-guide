@@ -208,7 +208,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: colors.surface,
         title: Text(
-          esPermisos ? 'Activá los permisos' : 'Activá el Bluetooth',
+          esPermisos ? 'Activa los permisos' : 'Activa el Bluetooth',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -218,9 +218,9 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
         content: Text(
           esPermisos
               ? 'UTP-Guide necesita acceso a Bluetooth para calcular tu '
-                  'posición dentro del edificio. Tocá "Reintentar" o '
-                  'activalos en Ajustes del sistema.'
-              : 'El Bluetooth está apagado. Activalo desde el panel de '
+                  'posición dentro del edificio. Toca "Reintentar" o '
+                  'actívalos en Ajustes del sistema.'
+              : 'El Bluetooth está apagado. Actívalo desde el panel de '
                   'control rápido para ver tu posición en el mapa.',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
@@ -448,7 +448,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                   ),
                 ),
                 Text(
-                  'Tocá un punto para verlo',
+                  'Toca un punto para verlo',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
