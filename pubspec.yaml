@@ -48,4 +48,5 @@ flutter:
     - assets/data/grafo.json
     - assets/data/beacon_config.json
     - assets/maps/
-    - assets/models/
+    # - assets/models/   # vacía (era para modelos de AR, desactivada).
+    #   Una carpeta de assets vacía declarada aquí puede romper el bundle.
