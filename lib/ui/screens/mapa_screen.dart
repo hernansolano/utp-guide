@@ -16,6 +16,7 @@ import '../../services/positioning_service.dart';
 import '../../services/routing_service.dart';
 import '../../services/traza_service.dart';
 import '../../services/tts_service.dart';
+import '../../app_config.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/map_view.dart';
@@ -126,7 +127,9 @@ class _MapaScreenState extends State<MapaScreen> {
     _perfilActual = widget.perfil;
     _mapController.addListener(_onMapControllerCambio);
     _cargarRutaYDimensiones();
-    _iniciarAcelerometro();
+    // AR desactivada (ver app_config.dart): sin acelerómetro, sin cambio
+    // de modo. Se reactiva poniendo kArHabilitado en true.
+    if (kArHabilitado) _iniciarAcelerometro();
     _iniciarPosicionamiento();
   }
 
@@ -178,8 +181,9 @@ class _MapaScreenState extends State<MapaScreen> {
 
     var origenId = _origenActualId;
     if (origenId == null) {
-      final entradas =
-          await widget.routingService.nodosPorTipo(TipoNodo.entrada);
+      final entradas = await widget.routingService.nodosPorTipo(
+        TipoNodo.entrada,
+      );
       if (!mounted || tokenLocal != _tokenRecalculo) return;
       if (entradas.isEmpty) throw Exception('Sin nodo de entrada');
       origenId = entradas.first.id;
@@ -247,23 +251,25 @@ class _MapaScreenState extends State<MapaScreen> {
   // ─── Acelerómetro ──────────────────────────────────────────────────────────
 
   void _iniciarAcelerometro() {
-    _acelerometroSub = accelerometerEventStream(
-      samplingPeriod: const Duration(milliseconds: 200),
-    ).listen((event) {
-      if (!widget.arAutomaticoNotifier.value) return;
-      final angulo =
-          atan2(event.z, sqrt(event.x * event.x + event.y * event.y));
-      final grados = angulo * 180 / pi;
-      if (!_enModoAR && grados > 35) setState(() => _enModoAR = true);
-      if (_enModoAR && grados < 25) setState(() => _enModoAR = false);
-    });
+    _acelerometroSub =
+        accelerometerEventStream(
+          samplingPeriod: const Duration(milliseconds: 200),
+        ).listen((event) {
+          if (!widget.arAutomaticoNotifier.value) return;
+          final angulo = atan2(
+            event.z,
+            sqrt(event.x * event.x + event.y * event.y),
+          );
+          final grados = angulo * 180 / pi;
+          if (!_enModoAR && grados > 35) setState(() => _enModoAR = true);
+          if (_enModoAR && grados < 25) setState(() => _enModoAR = false);
+        });
   }
 
   // ─── Posicionamiento BLE ───────────────────────────────────────────────────
 
   void _iniciarPosicionamiento() {
-    _estadoBleSub =
-        widget.positioningService.estadoBleStream.listen((estado) {
+    _estadoBleSub = widget.positioningService.estadoBleStream.listen((estado) {
       if (!mounted) return;
       setState(() {
         _bleEstado = estado;
@@ -282,8 +288,7 @@ class _MapaScreenState extends State<MapaScreen> {
       // Updates de alta frecuencia van por notifiers — no causan
       // rebuild del Stack completo.
       _posicionUsuarioNotifier.value = pos;
-      _beaconsActivosNotifier.value =
-          widget.positioningService.beaconsActivos;
+      _beaconsActivosNotifier.value = widget.positioningService.beaconsActivos;
 
       // Re-enrutar desde la posición real del usuario (throttled).
       _quizasReenrutar(pos);
@@ -359,11 +364,11 @@ class _MapaScreenState extends State<MapaScreen> {
         content: Text(
           esPermisos
               ? 'UTP-Guide necesita acceso a Bluetooth para calcular tu '
-                  'posición dentro del edificio. Actívalo en Ajustes del '
-                  'sistema → Apps → UTP Guide → Permisos.'
+                    'posición dentro del edificio. Actívalo en Ajustes del '
+                    'sistema → Apps → UTP Guide → Permisos.'
               : 'El Bluetooth de tu dispositivo está apagado. Actívalo '
-                  'desde el panel de control rápido para ver tu posición '
-                  'en el mapa.',
+                    'desde el panel de control rápido para ver tu posición '
+                    'en el mapa.',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
             color: colors.fgMuted,
@@ -412,17 +417,21 @@ class _MapaScreenState extends State<MapaScreen> {
     if (pos == null || _ruta.length < 2 || _pasos.isEmpty) return 0;
 
     final destino = _ruta.last;
-    final distAlDestino =
-        sqrt(pow(pos.x - destino.x, 2) + pow(pos.y - destino.y, 2));
+    final distAlDestino = sqrt(
+      pow(pos.x - destino.x, 2) + pow(pos.y - destino.y, 2),
+    );
     if (distAlDestino < 1.0) return _pasos.length - 1;
 
     double minDist = double.infinity;
     int mejorSegmento = 0;
     for (int i = 0; i < _ruta.length - 1; i++) {
       final dist = _distanciaPuntoASegmento(
-        pos.x, pos.y,
-        _ruta[i].x, _ruta[i].y,
-        _ruta[i + 1].x, _ruta[i + 1].y,
+        pos.x,
+        pos.y,
+        _ruta[i].x,
+        _ruta[i].y,
+        _ruta[i + 1].x,
+        _ruta[i + 1].y,
       );
       if (dist < minDist) {
         minDist = dist;
@@ -433,7 +442,13 @@ class _MapaScreenState extends State<MapaScreen> {
   }
 
   double _distanciaPuntoASegmento(
-      double px, double py, double ax, double ay, double bx, double by) {
+    double px,
+    double py,
+    double ax,
+    double ay,
+    double bx,
+    double by,
+  ) {
     final dx = bx - ax;
     final dy = by - ay;
     final len2 = dx * dx + dy * dy;
@@ -520,11 +535,13 @@ class _MapaScreenState extends State<MapaScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final nombreDestino =
-        _ruta.isNotEmpty ? _ruta.last.nombre : widget.destinoId;
+    final nombreDestino = _ruta.isNotEmpty
+        ? _ruta.last.nombre
+        : widget.destinoId;
 
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _mostrarDialogoBleSiAplica());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _mostrarDialogoBleSiAplica(),
+    );
 
     if (_cargando) {
       return Scaffold(
@@ -543,8 +560,11 @@ class _MapaScreenState extends State<MapaScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    color: colors.danger, size: 48),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: colors.danger,
+                  size: 48,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   _error!,
@@ -596,7 +616,9 @@ class _MapaScreenState extends State<MapaScreen> {
                                   posicionTarget: simulando ? posVirtual : null,
                                   traza: traza,
                                   panZoomHabilitado: !simulando,
-                                  onTapMundo: simulando ? _onTapPosicionVirtual : null,
+                                  onTapMundo: simulando
+                                      ? _onTapPosicionVirtual
+                                      : null,
                                   controller: _mapController,
                                 ),
                               );
@@ -614,7 +636,11 @@ class _MapaScreenState extends State<MapaScreen> {
                   left: 20,
                   right: 20,
                   child: _buildDestinationPill(
-                      context, colors, nombreDestino, dist),
+                    context,
+                    colors,
+                    nombreDestino,
+                    dist,
+                  ),
                 ),
 
                 // Controles laterales.
@@ -635,10 +661,11 @@ class _MapaScreenState extends State<MapaScreen> {
                       ),
                       const SizedBox(height: 10),
                       _sideButton(
-                          context,
-                          colors,
-                          Icons.format_list_bulleted_rounded,
-                          _mostrarBottomSheetPasos),
+                        context,
+                        colors,
+                        Icons.format_list_bulleted_rounded,
+                        _mostrarBottomSheetPasos,
+                      ),
                       const SizedBox(height: 10),
                       _sideButton(
                         context,
@@ -659,52 +686,52 @@ class _MapaScreenState extends State<MapaScreen> {
                     left: 16,
                     bottom: 16,
                     child: ListenableBuilder(
-                      listenable: Listenable.merge(
-                          [_posicionUsuarioNotifier, _beaconsActivosNotifier]),
+                      listenable: Listenable.merge([
+                        _posicionUsuarioNotifier,
+                        _beaconsActivosNotifier,
+                      ]),
                       builder: (_, _) => _buildBleChip(colors),
                     ),
                   ),
 
-                // FAB AR/Mapa.
-                Positioned(
-                  right: 20,
-                  bottom: 20,
-                  child: GestureDetector(
-                    onTap: () => setState(() => _enModoAR = !_enModoAR),
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: colors.brand,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: colors.brand.withValues(alpha: 0.35),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        _enModoAR
-                            ? Icons.map_rounded
-                            : Icons.camera_alt_rounded,
-                        color: Colors.white,
-                        size: 26,
+                // FAB AR/Mapa (desactivado: AR no se usa, ver app_config.dart).
+                if (kArHabilitado)
+                  Positioned(
+                    right: 20,
+                    bottom: 20,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _enModoAR = !_enModoAR),
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: colors.brand,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: colors.brand.withValues(alpha: 0.35),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          _enModoAR
+                              ? Icons.map_rounded
+                              : Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
                       ),
                     ),
                   ),
-                ),
 
                 // Minimapa (modo AR).
                 if (_enModoAR)
                   Positioned(
                     left: 16,
                     bottom: 16,
-                    child: MinimapWidget(
-                      ruta: _ruta,
-                      mapaSize: mapaSize,
-                    ),
+                    child: MinimapWidget(ruta: _ruta, mapaSize: mapaSize),
                   ),
 
                 // Debug overlay (solo en debug builds + toggle).
@@ -758,8 +785,12 @@ class _MapaScreenState extends State<MapaScreen> {
 
   // ─── Widgets auxiliares ────────────────────────────────────────────────────
 
-  Widget _buildDestinationPill(BuildContext context, AppColors colors,
-      String nombre, double dist) {
+  Widget _buildDestinationPill(
+    BuildContext context,
+    AppColors colors,
+    String nombre,
+    double dist,
+  ) {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -777,7 +808,10 @@ class _MapaScreenState extends State<MapaScreen> {
       child: Row(
         children: [
           _pillIconButton(
-              Icons.arrow_back_rounded, () => context.pop(), Colors.white),
+            Icons.arrow_back_rounded,
+            () => context.pop(),
+            Colors.white,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -805,16 +839,11 @@ class _MapaScreenState extends State<MapaScreen> {
               ],
             ),
           ),
-          _pillIconButton(
-            Icons.volume_up_rounded,
-            () {
-              if (_pasos.isNotEmpty && _pasoActualIndice < _pasos.length) {
-                widget.ttsService
-                    .hablar(_pasos[_pasoActualIndice].instruccion);
-              }
-            },
-            Colors.white,
-          ),
+          _pillIconButton(Icons.volume_up_rounded, () {
+            if (_pasos.isNotEmpty && _pasoActualIndice < _pasos.length) {
+              widget.ttsService.hablar(_pasos[_pasoActualIndice].instruccion);
+            }
+          }, Colors.white),
           const SizedBox(width: 4),
         ],
       ),
@@ -856,7 +885,9 @@ class _MapaScreenState extends State<MapaScreen> {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1), blurRadius: 8),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+            ),
           ],
         ),
         child: cargando
@@ -865,11 +896,11 @@ class _MapaScreenState extends State<MapaScreen> {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                      activo ? Colors.white : colors.brand),
+                    activo ? Colors.white : colors.brand,
+                  ),
                 ),
               )
-            : Icon(icon,
-                color: activo ? Colors.white : colors.fg, size: 20),
+            : Icon(icon, color: activo ? Colors.white : colors.fg, size: 20),
       ),
     );
   }
@@ -889,8 +920,7 @@ class _MapaScreenState extends State<MapaScreen> {
         color: bgColor.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(999),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
         ],
       ),
       child: Row(
@@ -919,7 +949,10 @@ class _MapaScreenState extends State<MapaScreen> {
   }
 
   Widget _buildNavigationCard(
-      BuildContext context, AppColors colors, String nombre) {
+    BuildContext context,
+    AppColors colors,
+    String nombre,
+  ) {
     final paso = (_pasos.isNotEmpty && _pasoActualIndice < _pasos.length)
         ? _pasos[_pasoActualIndice]
         : null;
@@ -932,13 +965,14 @@ class _MapaScreenState extends State<MapaScreen> {
     if (esLlegada) {
       subtitulo = '¡Has llegado!';
     } else if (posUsuario != null) {
-      subtitulo = 'Paso ${_pasoActualIndice + 1} de ${_pasos.length}'
+      subtitulo =
+          'Paso ${_pasoActualIndice + 1} de ${_pasos.length}'
           ' · (${posUsuario.x.toStringAsFixed(1)} m, '
           '${posUsuario.y.toStringAsFixed(1)} m)';
     } else {
       subtitulo = paso != null && _pasos.length > 1
           ? 'Paso ${_pasoActualIndice + 1} de ${_pasos.length}'
-              ' · esperando señal BLE…'
+                ' · esperando señal BLE…'
           : 'Esperando señal BLE…';
     }
 
@@ -993,8 +1027,7 @@ class _MapaScreenState extends State<MapaScreen> {
           ),
           const SizedBox(width: 12),
           GestureDetector(
-            onTap: () =>
-                context.canPop() ? context.pop() : context.go('/'),
+            onTap: () => context.canPop() ? context.pop() : context.go('/'),
             child: Container(
               height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1232,18 +1265,16 @@ class _DebugOverlay extends StatelessWidget {
               ),
             )
           else ...[
-            const _LineaDebug(
-              'minor   rssi      d       edad',
-              isHeader: true,
-            ),
+            const _LineaDebug('minor   rssi      d       edad', isHeader: true),
             ...lecturas.values.map((b) => _LineaBeacon(info: b)),
           ],
           const SizedBox(height: 8),
           _LineaCoords(label: 'cruda', pos: posCruda, color: Colors.orange),
           _LineaCoords(
-              label: 'snap ',
-              pos: posicionSnapped,
-              color: Colors.lightGreenAccent),
+            label: 'snap ',
+            pos: posicionSnapped,
+            color: Colors.lightGreenAccent,
+          ),
           if (posCruda != null && posicionSnapped != null) ...[
             const SizedBox(height: 2),
             _LineaDebug(
@@ -1265,8 +1296,11 @@ class _LineaDebug extends StatelessWidget {
   final bool isHeader;
   final Color color;
 
-  const _LineaDebug(this.texto,
-      {this.isHeader = false, this.color = Colors.white});
+  const _LineaDebug(
+    this.texto, {
+    this.isHeader = false,
+    this.color = Colors.white,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1365,14 +1399,10 @@ class _LineaCoords extends StatelessWidget {
     final texto = pos == null
         ? '$label  —'
         : '$label  (${pos!.x.toStringAsFixed(2)}, '
-            '${pos!.y.toStringAsFixed(2)})';
+              '${pos!.y.toStringAsFixed(2)})';
     return Text(
       texto,
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 10,
-        color: color,
-      ),
+      style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: color),
     );
   }
 }

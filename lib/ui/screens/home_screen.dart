@@ -25,6 +25,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _piso;
   String? _svgPath;
 
+  // Easter egg: 7 taps sobre el logo abren el Modo Investigador (JIC).
+  // Patrón conocido en Android: no se descubre por accidente, trivial
+  // para el equipo. La ventana de 2 s entre taps evita falsos positivos.
+  int _logoTaps = 0;
+  DateTime _ultimoTapLogo = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +53,17 @@ class _HomeScreenState extends State<HomeScreen> {
       // Si falla la carga del grafo, el header sigue mostrando placeholders
       // — no es bloqueante para que el usuario pueda al menos llegar a
       // SearchScreen y ver el error real ahí.
+    }
+  }
+
+  void _onLogoTap() {
+    final ahora = DateTime.now();
+    if (ahora.difference(_ultimoTapLogo).inSeconds > 2) _logoTaps = 0;
+    _ultimoTapLogo = ahora;
+    _logoTaps++;
+    if (_logoTaps >= 7) {
+      _logoTaps = 0;
+      context.push('/research');
     }
   }
 
@@ -97,22 +114,25 @@ class _HomeScreenState extends State<HomeScreen> {
           20, MediaQuery.of(context).padding.top + 16, 20, 12),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colors.line),
-            ),
-            padding: const EdgeInsets.all(6),
-            child: Image.asset(
-              'assets/maps/logo-utp-color.png',
-              fit: BoxFit.contain,
-              errorBuilder: (ctx, e, s) => Icon(
-                Icons.school_rounded,
-                color: colors.brand,
-                size: 24,
+          GestureDetector(
+            onTap: _onLogoTap,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colors.line),
+              ),
+              padding: const EdgeInsets.all(6),
+              child: Image.asset(
+                'assets/maps/logo-utp-color.png',
+                fit: BoxFit.contain,
+                errorBuilder: (ctx, e, s) => Icon(
+                  Icons.school_rounded,
+                  color: colors.brand,
+                  size: 24,
+                ),
               ),
             ),
           ),

@@ -44,3 +44,11 @@ app.*.map.json
 /android/app/release
 /android/build/
 
+
+# Escaneos de origen (Polycam DXF/CSV/PNG) — material de referencia local,
+# no se versiona. El mapa final vive en assets/maps + assets/data.
+samples/
+
+# Documentos de referencia de la JIC (lineamientos, instructivo, plan) —
+# material local, incluye binarios y bloqueos de Word. No se versiona.
+jic-files/

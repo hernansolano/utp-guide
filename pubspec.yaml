@@ -30,6 +30,11 @@ dependencies:
   # crudos. Auditado 2026-06-10: publisher verificado, sin llamadas de
   # red en el código, Apache-2.0 (ADR-0009).
   dchs_flutter_beacon: 0.6.8
+  # Modo Investigador (JIC): exportar datos de experimentos a archivo y
+  # compartir. Pin exacto + auditoría (ADR-0009): ambos usan canales
+  # nativos pero NO hacen llamadas de red. Plugins oficiales de flutter.dev.
+  path_provider: 2.1.5
+  share_plus: 10.1.4
 
 dev_dependencies:
   flutter_test:

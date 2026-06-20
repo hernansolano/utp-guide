@@ -89,6 +89,19 @@ class PositioningService {
   /// Se expone vía [debugPosicionCruda] para herramientas de debug.
   Position? _debugPosicionCruda;
 
+  /// Última posición suavizada emitida (estado del filtro EMA que hace
+  /// que el dot se mueva fluido en vez de saltar). Se resetea al detener.
+  Position? _posSuavizada;
+
+  /// Factor del EMA de suavizado del dot (0..1). Más bajo = más suave
+  /// pero con más lag.
+  static const double _alphaSuavizado = 0.35;
+
+  /// Fracción del "pull" del snap-to-graph (0 = sin pull, 1 = se pega del
+  /// todo a la arista). Suave a propósito: encarrila/filtra sin imantar el
+  /// dot al pasillo.
+  static const double _factorSnap = 0.5;
+
   final _controller = StreamController<Position?>.broadcast();
   StreamSubscription<BeaconReading>? _bleSub;
 
@@ -246,6 +259,7 @@ class PositioningService {
     _lecturas.clear();
     _configsBeacon.clear();
     _aristasCache = const [];
+    _posSuavizada = null;
     await _ble.detenerEscaneo();
   }
 
@@ -255,6 +269,7 @@ class PositioningService {
   void resetearVentanas() {
     _lecturas.clear();
     _debugPosicionCruda = null;
+    _posSuavizada = null;
   }
 
   /// Hot path: se ejecuta hasta varias veces por segundo. **Cero awaits**
@@ -324,23 +339,17 @@ class PositioningService {
     _debugPosicionCruda =
         Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
 
-    return _snapToGraphSync(x, y);
+    final snapOn = _snapHabilitadoListenable?.value ?? true;
+    if (!snapOn) {
+      // Modo crudo (debug): sin snap ni suavizado, para ver el salto real
+      // del centroide tal cual cae.
+      _posSuavizada = null;
+      return Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
+    }
+    return _suavizar(_snapToGraphSync(x, y));
   }
 
   Position _snapToGraphSync(double x, double y) {
-    // Cuando el toggle de calibración pide snap off, devolvemos la
-    // posición cruda directamente — útil para que el dev vea dónde
-    // "cae" el centroide ponderado sin la corrección de aristas.
-    if (_snapHabilitadoListenable != null &&
-        !_snapHabilitadoListenable.value) {
-      return Position(
-        x: x,
-        y: y,
-        piso: 1,
-        timestamp: DateTime.now(),
-      );
-    }
-
     double minDist = double.infinity;
     double snapX = x, snapY = y;
 
@@ -356,17 +365,30 @@ class PositioningService {
       }
     }
 
-    final dentroDeTolerancia =
-        minDist <= _calibracion.toleranciaSnapMetros;
-    final finalX = dentroDeTolerancia ? snapX : x;
-    final finalY = dentroDeTolerancia ? snapY : y;
+    // Pull SUAVE hacia la arista más cercana (a [_factorSnap] del camino),
+    // no se pega del todo: encarrila el dot y filtra posiciones sin
+    // sentido sin imantarlo rígidamente al pasillo. Fuera de la tolerancia
+    // se deja la posición cruda.
+    final dentro = minDist <= _calibracion.toleranciaSnapMetros;
+    final finalX = dentro ? x + _factorSnap * (snapX - x) : x;
+    final finalY = dentro ? y + _factorSnap * (snapY - y) : y;
+    return Position(x: finalX, y: finalY, piso: 1, timestamp: DateTime.now());
+  }
 
-    return Position(
-      x: finalX,
-      y: finalY,
-      piso: 1,
-      timestamp: DateTime.now(),
-    );
+  /// Suaviza el movimiento del dot con un EMA: filtra saltos bruscos (una
+  /// lectura mala ya no teletransporta el dot) y hace la "raya" fluida.
+  Position _suavizar(Position nueva) {
+    final prev = _posSuavizada;
+    final s = prev == null
+        ? nueva
+        : Position(
+            x: prev.x + _alphaSuavizado * (nueva.x - prev.x),
+            y: prev.y + _alphaSuavizado * (nueva.y - prev.y),
+            piso: 1,
+            timestamp: DateTime.now(),
+          );
+    _posSuavizada = s;
+    return s;
   }
 
   Offset _puntoEnSegmento(
@@ -387,6 +409,7 @@ class PositioningService {
     _bleSub?.cancel();
     _bleSub = null;
     _lecturas.clear();
+    _posSuavizada = null;
     _ble.detenerEscaneo();
     _controller.close();
   }

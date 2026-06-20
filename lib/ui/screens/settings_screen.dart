@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../app_config.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
 
@@ -76,8 +77,8 @@ class SettingsScreen extends StatelessWidget {
                             'Mejor para usar de noche o en interiores con poca luz.',
                         toggle: true,
                         value: darkModeNotifier.value,
-                        onToggle: () => darkModeNotifier.value =
-                            !darkModeNotifier.value,
+                        onToggle: () =>
+                            darkModeNotifier.value = !darkModeNotifier.value,
                         isLast: true,
                       ),
                       _SettingsRow(
@@ -122,17 +123,21 @@ class SettingsScreen extends StatelessWidget {
                         icon: Icons.map_outlined,
                         title: 'Mapa por defecto al abrir',
                         trailing: '2D',
+                        isLast: !kArHabilitado,
                       ),
-                      _SettingsRow(
-                        icon: Icons.camera_alt_outlined,
-                        title: 'AR automático con teléfono vertical',
-                        sub: 'Cambia de modo según la orientación.',
-                        toggle: true,
-                        value: arAutomaticoNotifier.value,
-                        onToggle: () => arAutomaticoNotifier.value =
-                            !arAutomaticoNotifier.value,
-                        isLast: true,
-                      ),
+                      // AR desactivada (ver app_config.dart). El toggle se
+                      // oculta; el código se conserva para reactivarla.
+                      if (kArHabilitado)
+                        _SettingsRow(
+                          icon: Icons.camera_alt_outlined,
+                          title: 'AR automático con teléfono vertical',
+                          sub: 'Cambia de modo según la orientación.',
+                          toggle: true,
+                          value: arAutomaticoNotifier.value,
+                          onToggle: () => arAutomaticoNotifier.value =
+                              !arAutomaticoNotifier.value,
+                          isLast: true,
+                        ),
                     ],
                   ),
                   // Sección "Desarrollador" solo visible en builds de debug.
@@ -165,7 +170,8 @@ class SettingsScreen extends StatelessWidget {
                         _SettingsRow(
                           icon: Icons.alt_route_rounded,
                           title: 'Snap-to-graph',
-                          sub: 'Si está OFF, el punto azul muestra la '
+                          sub:
+                              'Si está OFF, el punto azul muestra la '
                               'posición cruda del centroide sin pegarse '
                               'a los pasillos del grafo.',
                           toggle: true,
@@ -176,7 +182,8 @@ class SettingsScreen extends StatelessWidget {
                         _SettingsRow(
                           icon: Icons.gesture_rounded,
                           title: 'Capturar traza',
-                          sub: 'Dibuja una polilínea ámbar con todas las '
+                          sub:
+                              'Dibuja una polilínea ámbar con todas las '
                               'posiciones que el sistema marca mientras '
                               'esté activo.',
                           toggle: true,
@@ -231,12 +238,15 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildHeader(BuildContext context, AppColors colors) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          20, MediaQuery.of(context).padding.top + 14, 20, 14),
+        20,
+        MediaQuery.of(context).padding.top + 14,
+        20,
+        14,
+      ),
       child: Row(
         children: [
           IconButton(
-            onPressed: () =>
-                context.canPop() ? context.pop() : context.go('/'),
+            onPressed: () => context.canPop() ? context.pop() : context.go('/'),
             icon: Icon(Icons.arrow_back_rounded, color: colors.fg),
             style: IconButton.styleFrom(
               backgroundColor: colors.bgSoft,
@@ -380,8 +390,9 @@ class _SettingsRow extends StatelessWidget {
                     ),
                     child: AnimatedAlign(
                       duration: const Duration(milliseconds: 200),
-                      alignment:
-                          value ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: value
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Padding(
                         padding: const EdgeInsets.all(3),
                         child: Container(
@@ -412,7 +423,11 @@ class _SettingsRow extends StatelessWidget {
                   ),
                 ),
               if (!toggle && trailing == null && onTap != null)
-                Icon(Icons.chevron_right_rounded, color: colors.fgSoft, size: 20),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.fgSoft,
+                  size: 20,
+                ),
             ],
           ),
         ),

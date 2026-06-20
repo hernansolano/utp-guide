@@ -23,10 +23,19 @@ import 'ui/screens/mapa_screen.dart';
 import 'ui/screens/search_screen.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/theme/app_theme.dart';
+import 'research/screens/research_home_screen.dart';
+import 'research/screens/exp1_screen.dart';
+import 'research/screens/exp2_screen.dart';
+import 'research/services/measurement_repository.dart';
+import 'research/services/research_exporter.dart';
 
 // ─── Repositorios (singleton por app) ─────────────────────────────────────────
 final _grafoRepository  = GrafoRepository();
 final _beaconRepository = BeaconRepository();
+
+// ─── Modo Investigador (JIC) ──────────────────────────────────────────────
+final _measurementRepository = MeasurementRepository();
+final _researchExporter      = ResearchExporter();
 
 // ─── Preferencias globales (ValueNotifier<bool>) ──────────────────────────────
 // Cada toggle de SettingsScreen está atado a uno de estos notifiers. En
@@ -169,6 +178,37 @@ final _router = GoRouter(
         snapHabilitadoNotifier: snapHabilitadoNotifier,
         trazaActivaNotifier: trazaActivaNotifier,
       ),
+    ),
+    GoRoute(
+      path: '/research',
+      builder: (_, _) => ResearchHomeScreen(
+        repository: _measurementRepository,
+        exporter: _researchExporter,
+      ),
+    ),
+    GoRoute(
+      path: '/research/exp1',
+      builder: (_, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return Exp1Screen(
+          positioningService: _positioningService,
+          repository: _measurementRepository,
+          tester: extra?['tester'] as String? ?? 'desconocido',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/research/exp2',
+      builder: (_, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return Exp2Screen(
+          positioningService: _positioningService,
+          beaconRepository: _beaconRepository,
+          grafoRepository: _grafoRepository,
+          repository: _measurementRepository,
+          tester: extra?['tester'] as String? ?? 'desconocido',
+        );
+      },
     ),
     GoRoute(
       path: '/calibracion',
