@@ -1,9 +1,8 @@
 {
-  "_descripcion": "Configuración de balizas BLE y parámetros de calibración del posicionamiento. Editar en campo no requiere recompilar la app.",
+  "_descripcion": "Configuración de balizas BLE y parámetros de calibración. FISC piso 4. Editar en campo no requiere recompilar.",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
-  "major": 1,
+  "major": 4,
   "calibracion": {
-    "_descripcion": "Parámetros del modelo de path-loss para entornos interiores con muros de concreto (FISC). Ver docs/adr/0002-parametros-path-loss.md.",
     "txPower_dbm_default": -65,
     "n_exponente_perdida": 3.5,
     "ventana_media_movil": 8,
@@ -11,10 +10,10 @@
     "expiracion_lectura_segundos": 3
   },
   "beacons": [
-    {"minor": 1, "x": 1.87,  "y": 0.00,  "txPower_dbm": -65, "descripcion": "Pasillo · norte (h 2.50 m)"},
-    {"minor": 2, "x": 0.00,  "y": 7.77,  "txPower_dbm": -65, "descripcion": "Pasillo · oeste centro (h 2.50 m)"},
-    {"minor": 3, "x": 1.87,  "y": 15.54, "txPower_dbm": -65, "descripcion": "Pasillo · sur (h 2.50 m)"},
-    {"minor": 4, "x": 11.70, "y": 11.65, "txPower_dbm": -65, "descripcion": "Aula · este centro (h 2.50 m)"},
-    {"minor": 5, "x": 7.72,  "y": 15.54, "txPower_dbm": -65, "descripcion": "Aula · sur centro (h 2.50 m)"}
+    {"minor": 1, "x": 10.29,  "y": 28.673, "txPower_dbm": -65, "descripcion": "Fondo pasillo vertical (sur)"},
+    {"minor": 2, "x": 0.294,  "y": 2.801,  "txPower_dbm": -65, "descripcion": "Esquina noroeste"},
+    {"minor": 3, "x": 22.772, "y": 2.871,  "txPower_dbm": -65, "descripcion": "Esquina noreste"},
+    {"minor": 4, "x": 10.081, "y": 5.823,  "txPower_dbm": -65, "descripcion": "Junción pasillo / vertical"},
+    {"minor": 5, "x": 6.547,  "y": 15.911, "txPower_dbm": -65, "descripcion": "Pasillo vertical (baños)"}
   ]
 }

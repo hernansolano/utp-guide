@@ -3,16 +3,16 @@
   Editor de mapa — UTP-Guide (herramienta de escritorio, offline)
 
   Carga el borrador_mapa.json que produce `dart tools/mapa_importer.dart parse`,
-  dibuja el piso (muros + puertas + ventanas) y permite:
+  dibuja el piso (muros + puertas + ventanas) y permite armar el mapa COMPLETO:
     - marcar qué cuartos incluir (Polycam etiqueta "ignore" los que no van),
-    - agregar y ARRASTRAR balizas a mano (sin sugerencias automáticas),
-    - editar txPower y descripción de cada baliza,
-    - exportar mapa.svg + beacon_config.json listos para assets/.
+    - BALIZAS: agregar/arrastrar a mano, editar txPower y descripción,
+    - NODOS del grafo: puertas de salones, baños, oficinas, ascensores,
+      escaleras, entradas… con nombre, tipo e info (accesible),
+    - ARISTAS: conectar nodos para que el grafo sea navegable,
+    - exportar mapa.svg + grafo.json + beacon_config.json listos para assets/.
 
-  Es un archivo único sin dependencias: se abre directo en el navegador.
-  La app móvil NO usa esto — solo consume los assets generados.
-
-  Pendiente (siguiente incremento): edición de nodos/aristas del grafo.
+  Archivo único sin dependencias: se abre directo en el navegador. La app
+  móvil NO usa esto — solo consume los assets generados.
 -->
 <html lang="es">
 <head>
@@ -46,8 +46,8 @@
   svg#mapa { background: var(--suelo); box-shadow: 0 2px 16px rgba(0,0,0,.12);
     max-width: 100%; max-height: 100%; touch-action: none; }
   aside {
-    width: 320px; border-left: 1px solid var(--line); background: var(--surface);
-    overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px;
+    width: 340px; border-left: 1px solid var(--line); background: var(--surface);
+    overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px;
   }
   .seccion h2 {
     font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
@@ -62,36 +62,37 @@
   button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
   button.primary:hover { filter: brightness(1.08); }
   button:disabled { opacity: .5; cursor: default; }
-  label.file { display: inline-block; }
-  input[type=file] { display: none; }
-  .fila { display: flex; align-items: center; gap: 8px; }
+  label.file input[type=file] { display: none; }
+  .modos { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; }
+  .modos button { flex: 1; border: none; border-radius: 0; border-right: 1px solid var(--line); }
+  .modos button:last-child { border-right: none; }
+  .modos button.on { background: var(--brand); color: #fff; }
   .cuarto { display: flex; align-items: center; gap: 8px; padding: 5px 0;
     border-bottom: 1px solid #efece4; }
   .cuarto small { color: var(--mut); }
-  .balizaItem { padding: 8px; border: 1px solid var(--line); border-radius: 8px;
-    margin-bottom: 8px; }
-  .balizaItem.sel { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(27,79,114,.15); }
-  .balizaItem .top { display: flex; justify-content: space-between; align-items: center; }
-  .balizaItem .coords { font-family: ui-monospace, monospace; font-size: 12px; color: var(--mut); }
+  .item { padding: 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
+  .item.sel { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(27,79,114,.15); }
+  .item .top { display: flex; justify-content: space-between; align-items: center; }
+  .item .coords { font-family: ui-monospace, monospace; font-size: 12px; color: var(--mut); }
   .campo { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-  .campo label { width: 64px; font-size: 12px; color: var(--mut); }
-  .campo input { flex: 1; font: inherit; padding: 4px 6px; border: 1px solid var(--line);
-    border-radius: 6px; }
+  .campo label { width: 70px; font-size: 12px; color: var(--mut); }
+  .campo input, .campo select { flex: 1; font: inherit; padding: 4px 6px;
+    border: 1px solid var(--line); border-radius: 6px; }
   .x { color: var(--danger); border: none; background: none; font-size: 16px; padding: 0 4px; }
   .vacio { color: var(--mut); font-size: 13px; }
-  .beacon { cursor: grab; }
-  .beacon:active { cursor: grabbing; }
-  .beacon:hover circle:first-child { opacity: .85 !important; stroke-width: 2 !important; }
-  #tooltip {
-    position: fixed; pointer-events: none; background: var(--ink); color: #fff;
+  .beacon, .nodo { cursor: grab; }
+  .beacon:hover circle:first-child, .nodo:hover circle:first-child { opacity: .85 !important; }
+  #tooltip { position: fixed; pointer-events: none; background: var(--ink); color: #fff;
     font: 12px ui-monospace, monospace; padding: 3px 7px; border-radius: 6px;
-    transform: translate(-50%, -160%); display: none; z-index: 10;
-  }
-  .hintbox { font-size: 12px; color: var(--mut); line-height: 1.5; margin: 8px 0 0; }
+    transform: translate(-50%, -160%); display: none; z-index: 10; }
+  .hintbox { font-size: 12px; color: var(--mut); line-height: 1.5; margin: 6px 0; }
   .hintbox kbd { background: #efece4; border: 1px solid var(--line); border-radius: 4px;
     padding: 0 4px; font-family: ui-monospace, monospace; font-size: 11px; }
   .barra { display: flex; gap: 8px; flex-wrap: wrap; }
   #status { font-size: 12px; color: var(--mut); min-height: 16px; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 > * { flex: 1; }
 </style>
 </head>
 <body>
@@ -101,7 +102,7 @@
     <input type="file" id="archivo" accept=".json">
     <span class="primary" style="padding:7px 12px;border-radius:8px;display:inline-block">Cargar borrador_mapa.json</span>
   </label>
-  <span class="hint" id="info">Genera el borrador con: <code>dart tools/mapa_importer.dart parse "tu.dxf"</code></span>
+  <span class="hint">Genera el borrador con: <code>dart tools/mapa_importer.dart parse "tu.dxf"</code></span>
 </header>
 
 <main>
@@ -112,30 +113,34 @@
 
   <aside>
     <div class="seccion">
+      <h2>Modo de edición</h2>
+      <div class="modos" id="modos">
+        <button data-modo="balizas" class="on">Balizas</button>
+        <button data-modo="nodos">Nodos</button>
+        <button data-modo="aristas">Aristas</button>
+      </div>
+    </div>
+
+    <div class="seccion">
       <h2>Cuartos a incluir</h2>
       <div id="cuartos"><div class="vacio">—</div></div>
     </div>
 
-    <div class="seccion">
-      <h2>Balizas (a mano)</h2>
-      <div class="barra" style="margin-bottom:6px">
-        <button class="primary" id="addBaliza" disabled>+ Agregar baliza</button>
-      </div>
-      <p class="hintbox"><b>Doble clic</b> en el plano para crear una baliza ahí ·
-        <b>arrastra</b> para mover · <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ajustan
-        (10 cm; con <kbd>Shift</kbd>, 50 cm) · <kbd>Supr</kbd> borra la seleccionada.</p>
-      <div id="balizas" style="margin-top:10px"><div class="vacio">Sin balizas. Toca “Agregar baliza” o doble clic en el plano.</div></div>
-    </div>
+    <div class="seccion" id="panel"><div class="vacio">—</div></div>
 
     <div class="seccion">
       <h2>Exportar</h2>
+      <div class="row2" style="margin-bottom:10px">
+        <div class="campo"><label>Piso</label><input type="number" id="piso" value="1"></div>
+        <div class="campo"><label>Edificio</label><input type="text" id="edificio" value="FISC"></div>
+      </div>
       <div class="barra">
         <button id="expSvg" disabled>mapa.svg</button>
+        <button id="expGrafo" disabled>grafo.json</button>
         <button id="expBeacons" disabled>beacon_config.json</button>
       </div>
       <p class="hint" style="margin:10px 0 0">Copia los archivos a <code>assets/maps/</code> y
-        <code>assets/data/</code> cuando estén listos. El grafo (nodos) se hará en el
-        siguiente incremento.</p>
+        <code>assets/data/</code> cuando estén listos.</p>
     </div>
 
     <div id="status"></div>
@@ -147,96 +152,78 @@
 "use strict";
 
 const PX = 100;          // 100 px = 1 m (ADR-0006)
-const ESCALA = -65;      // txPower por defecto
+const TXP = -65;         // txPower por defecto de baliza
 const UUID = "550e8400-e29b-41d4-a716-446655440000";
 const MARGEN = 0.15;     // margen del lienzo, m
 const CROP = 0.3;        // margen de pertenencia al cuarto, m
 
-let draft = null;        // borrador cargado
-let balizas = [];        // {x, y, txPower, desc}  en metros (coords del borrador)
-let seleccion = -1;      // índice de baliza seleccionada
-let crop = null;         // {minX, minY, ancho, alto}
-let nextMinor = 1;
+// Tipos de nodo del grafo (código del grafo.json + etiqueta + color, igual
+// que MapaPainter.colorParaTipo en la app).
+const TIPOS = [
+  { c: 'SALON',        t: 'Salón',          col: '#3B82F6' },
+  { c: 'BANO',         t: 'Baño',           col: '#06B6D4' },
+  { c: 'OFICINA',      t: 'Oficina',        col: '#8B5CF6' },
+  { c: 'ENTRADA',      t: 'Entrada/Salida', col: '#22C55E' },
+  { c: 'ASCENSOR',     t: 'Ascensor',       col: '#F59E0B' },
+  { c: 'ESCALERA',     t: 'Escalera',       col: '#F59E0B' },
+  { c: 'BEBEDERO',     t: 'Bebedero',       col: '#14B8A6' },
+  { c: 'COMEDOR',      t: 'Comedor',        col: '#EF4444' },
+  { c: 'INTERSECCION', t: 'Punto de paso',  col: '#94A3B8' },
+];
+const colorTipo = (c) => (TIPOS.find(x => x.c === c) || {}).col || '#94A3B8';
+
+let draft = null;
+let balizas = [];        // {minor, x, y, txPower, desc}  metros (coords borrador)
+let nodos = [];          // {id, tipo, nombre, x, y, accesible}
+let aristas = [];        // {origenId, destinoId}
+let modo = 'balizas';
+let selBaliza = -1, selNodo = -1, aristaOrigen = null;
+let crop = null, nextMinor = 1, nextNodo = 1;
 
 const $ = (id) => document.getElementById(id);
 const svg = $("mapa");
 
-// Doble clic en el plano (área vacía) → crea baliza ahí.
-svg.addEventListener("dblclick", (e) => {
-  if (!draft || e.target.closest(".beacon")) return;
-  const m = svgCoords(e);
-  balizas.push({ minor: nextMinor++, x: r3(m.x), y: r3(m.y), txPower: ESCALA, desc: "" });
-  seleccion = balizas.length - 1;
-  render();
-});
-// Clic en área vacía → deselecciona.
-svg.addEventListener("pointerdown", (e) => {
-  if (!draft || e.target.closest(".beacon")) return;
-  if (seleccion !== -1) { seleccion = -1; render(); }
-});
-// Teclado: flechas ajustan la baliza seleccionada; Supr la borra.
-document.addEventListener("keydown", (e) => {
-  const tag = document.activeElement && document.activeElement.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA") return;
-  if (seleccion < 0 || !balizas[seleccion]) return;
-  const b = balizas[seleccion];
-  const paso = e.shiftKey ? 0.5 : 0.1;
-  switch (e.key) {
-    case "ArrowLeft":  b.x = r3(b.x - paso); break;
-    case "ArrowRight": b.x = r3(b.x + paso); break;
-    case "ArrowUp":    b.y = r3(b.y - paso); break;
-    case "ArrowDown":  b.y = r3(b.y + paso); break;
-    case "Delete":
-    case "Backspace":
-      balizas.splice(seleccion, 1);
-      seleccion = Math.min(seleccion, balizas.length - 1);
-      break;
-    default: return;
-  }
-  e.preventDefault();
-  render();
+// ─── Modo ─────────────────────────────────────────────────────────────────
+$("modos").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-modo]");
+  if (!b) return;
+  modo = b.dataset.modo;
+  selBaliza = -1; selNodo = -1; aristaOrigen = null;
+  for (const x of $("modos").children) x.classList.toggle("on", x.dataset.modo === modo);
+  if (draft) { render(); renderPanel(); }
 });
 
-// ─── Carga del borrador ───────────────────────────────────────────────────
-
+// ─── Carga ──────────────────────────────────────────────────────────────
 $("archivo").addEventListener("change", (e) => {
   const f = e.target.files[0];
   if (!f) return;
   const r = new FileReader();
   r.onload = () => {
-    try {
-      draft = JSON.parse(r.result);
-      iniciar();
-      setStatus(`Cargado: ${f.name}`);
-    } catch (err) {
-      setStatus("Error al leer el JSON: " + err.message);
-    }
+    try { draft = JSON.parse(r.result); iniciar(); setStatus(`Cargado: ${f.name}`); }
+    catch (err) { setStatus("Error al leer el JSON: " + err.message); }
   };
   r.readAsText(f);
 });
 
 function iniciar() {
-  balizas = [];
-  seleccion = -1;
-  nextMinor = 1;
-  // Asegura el flag incluir (Polycam marca "ignore").
+  balizas = []; nodos = []; aristas = [];
+  selBaliza = -1; selNodo = -1; aristaOrigen = null;
+  nextMinor = 1; nextNodo = 1;
   for (const c of draft.cuartos) {
-    if (c.incluir === undefined) c.incluir = !(c.nombre_sugerido || "").toLowerCase().includes("ignore");
+    if (c.incluir === undefined)
+      c.incluir = !(c.nombre_sugerido || "").toLowerCase().includes("ignore");
   }
   $("placeholder").style.display = "none";
   svg.style.display = "block";
-  $("addBaliza").disabled = false;
-  $("expSvg").disabled = false;
-  $("expBeacons").disabled = false;
+  for (const id of ["expSvg", "expGrafo", "expBeacons"]) $(id).disabled = false;
   renderCuartos();
   recomputarCrop();
   render();
+  renderPanel();
 }
 
-// ─── Geometría / recorte (replica tools/mapa_importer.dart build) ──────────
-
+// ─── Geometría / recorte (replica mapa_importer build) ─────────────────────
 function incluidos() { return draft.cuartos.filter(c => c.incluir); }
-
 function bboxDe(pts) {
   let a = { minX: pts[0].x, minY: pts[0].y, maxX: pts[0].x, maxY: pts[0].y };
   for (const p of pts) {
@@ -245,21 +232,15 @@ function bboxDe(pts) {
   }
   return a;
 }
-
 function centroide(pts) {
   let sx = 0, sy = 0;
   for (const p of pts) { sx += p.x; sy += p.y; }
   return { x: sx / pts.length, y: sy / pts.length };
 }
-
 function recomputarCrop() {
   const inc = incluidos();
-  const pts = [];
-  const bboxes = [];
-  for (const c of inc) {
-    pts.push(...c.poligono);
-    bboxes.push(bboxDe(c.poligono));
-  }
+  const pts = [], bboxes = [];
+  for (const c of inc) { pts.push(...c.poligono); bboxes.push(bboxDe(c.poligono)); }
   const area = pts.length ? bboxDe(pts)
     : { minX: 0, minY: 0, maxX: draft.mapa.ancho_metros, maxY: draft.mapa.alto_metros };
   crop = {
@@ -269,7 +250,6 @@ function recomputarCrop() {
     bboxes,
   };
 }
-
 function pertenece(c) {
   for (const b of crop.bboxes) {
     if (c.x >= b.minX - CROP && c.x <= b.maxX + CROP &&
@@ -277,11 +257,8 @@ function pertenece(c) {
   }
   return false;
 }
-
-// Quita duplicados y degenerados, recorta por cuarto y traslada a (0,0).
 function geomRecortada(polis) {
-  const vistos = new Set();
-  const out = [];
+  const vistos = new Set(), out = [];
   for (const poly of polis) {
     if (poly.length < 4) continue;
     if (!pertenece(centroide(poly))) continue;
@@ -293,14 +270,11 @@ function geomRecortada(polis) {
   return out;
 }
 
-// ─── Render del SVG ────────────────────────────────────────────────────────
-
+// ─── Render del SVG ─────────────────────────────────────────────────────
 function render() {
-  const w = Math.round(crop.ancho * PX);
-  const h = Math.round(crop.alto * PX);
+  const w = Math.round(crop.ancho * PX), h = Math.round(crop.alto * PX);
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  svg.setAttribute("width", w);
-  svg.setAttribute("height", h);
+  svg.setAttribute("width", w); svg.setAttribute("height", h);
 
   const muros = geomRecortada(draft.paredes || []);
   const puertas = geomRecortada(draft.puertas || []);
@@ -308,42 +282,56 @@ function render() {
 
   let s = `<rect id="fondo" x="0" y="0" width="${w}" height="${h}" fill="#F5F0E6"/>`;
   s += gridSvg(w, h);
-  // Muros rellenos
   s += `<g fill="#2C2C2A">`;
   for (const m of muros) s += `<polygon points="${pts(m)}"/>`;
-  s += `</g>`;
-  // Puertas (hueco)
-  s += `<g fill="#F5F0E6" stroke="#2C2C2A" stroke-width="1.5">`;
+  s += `</g><g fill="#F5F0E6" stroke="#2C2C2A" stroke-width="1.5">`;
   for (const p of puertas) s += `<polygon points="${pts(p)}"/>`;
-  s += `</g>`;
-  // Ventanas
-  s += `<g fill="#F5F0E6" stroke="#5B7FA6" stroke-width="2">`;
+  s += `</g><g fill="#F5F0E6" stroke="#5B7FA6" stroke-width="2">`;
   for (const v of ventanas) s += `<polygon points="${pts(v)}"/>`;
   s += `</g>`;
-  // Balizas (interactivas)
-  s += `<g id="capaBalizas">`;
-  balizas.forEach((b, i) => {
-    const x = (b.x - crop.minX) * PX, y = (b.y - crop.minY) * PX;
-    const sel = i === seleccion;
-    s += `<g class="beacon" data-i="${i}" transform="translate(${x},${y})">`;
-    s += `<circle r="16" fill="none" stroke="#1B4F72" stroke-width="${sel ? 2 : 1}" opacity="${sel ? .9 : .4}"/>`;
-    s += `<circle r="10" fill="#1B4F72" stroke="#fff" stroke-width="2"/>`;
-    s += `<text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${b.minor}</text>`;
+
+  // Aristas (líneas entre nodos), debajo de los nodos.
+  const byId = Object.fromEntries(nodos.map(n => [n.id, n]));
+  s += `<g stroke="#94A3B8" stroke-width="3" stroke-dasharray="6 5">`;
+  for (const a of aristas) {
+    const o = byId[a.origenId], d = byId[a.destinoId];
+    if (!o || !d) continue;
+    s += `<line x1="${px(o.x)}" y1="${py(o.y)}" x2="${px(d.x)}" y2="${py(d.y)}"/>`;
+  }
+  s += `</g>`;
+
+  // Nodos.
+  s += `<g font-family="sans-serif">`;
+  nodos.forEach((n, i) => {
+    const x = px(n.x), y = py(n.y), col = colorTipo(n.tipo);
+    const sel = i === selNodo, org = n.id === aristaOrigen;
+    s += `<g class="nodo" data-tipo="nodo" data-i="${i}" transform="translate(${x},${y})">`;
+    if (sel || org) s += `<circle r="13" fill="none" stroke="${org ? '#C0392B' : '#1B4F72'}" stroke-width="2"/>`;
+    s += `<circle r="7" fill="${col}" stroke="#fff" stroke-width="1.5"/>`;
+    if (n.nombre && n.tipo !== 'INTERSECCION')
+      s += `<text y="-11" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">${esc(n.nombre)}</text>`;
     s += `</g>`;
   });
   s += `</g>`;
 
+  // Balizas.
+  s += `<g font-family="sans-serif">`;
+  balizas.forEach((b, i) => {
+    const x = px(b.x), y = py(b.y), sel = i === selBaliza;
+    s += `<g class="beacon" data-tipo="baliza" data-i="${i}" transform="translate(${x},${y})">`;
+    s += `<circle r="16" fill="none" stroke="#1B4F72" stroke-width="${sel ? 2 : 1}" opacity="${sel ? .9 : .4}"/>`;
+    s += `<circle r="10" fill="#1B4F72" stroke="#fff" stroke-width="2"/>`;
+    s += `<text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${b.minor}</text></g>`;
+  });
+  s += `</g>`;
+
   svg.innerHTML = s;
-  // background floor rect (detrás de todo) — lo ponemos como fill del svg via CSS.
-  bindBeacons();
-  renderBalizasPanel();
+  svg.querySelectorAll(".beacon, .nodo").forEach(g => g.addEventListener("pointerdown", onDown));
 }
 
-function pts(poly) {
-  return poly.map(p => `${(p.x * PX).toFixed(1)},${(p.y * PX).toFixed(1)}`).join(" ");
-}
-
-// Cuadrícula métrica: línea fina cada 1 m + línea marcada cada 5 m.
+const px = (m) => ((m - crop.minX) * PX).toFixed(1);
+const py = (m) => ((m - crop.minY) * PX).toFixed(1);
+function pts(poly) { return poly.map(p => `${(p.x * PX).toFixed(1)},${(p.y * PX).toFixed(1)}`).join(" "); }
 function gridSvg(w, h) {
   let g = `<g stroke="#C9C6BC" stroke-width="0.6" opacity="0.6">`;
   for (let x = PX; x < w; x += PX) g += `<line x1="${x}" y1="0" x2="${x}" y2="${h}"/>`;
@@ -355,177 +343,269 @@ function gridSvg(w, h) {
   return g;
 }
 
-// Balizas que caen dentro del área recortada (en coords del borrador).
-function balizasDentro() {
-  return balizas.filter(b => {
-    const x = b.x - crop.minX, y = b.y - crop.minY;
-    return x >= 0 && x <= crop.ancho && y >= 0 && y <= crop.alto;
-  });
-}
+// ─── Interacciones con el mapa ───────────────────────────────────────────
+svg.addEventListener("dblclick", (e) => {
+  if (!draft || e.target.closest(".beacon, .nodo")) return;
+  const m = svgCoords(e);
+  if (modo === 'balizas') {
+    balizas.push({ minor: nextMinor++, x: r3(m.x), y: r3(m.y), txPower: TXP, desc: "" });
+    selBaliza = balizas.length - 1;
+  } else if (modo === 'nodos') {
+    nodos.push({ id: 'n' + (nextNodo++), tipo: 'SALON', nombre: '', x: r3(m.x), y: r3(m.y), accesible: true });
+    selNodo = nodos.length - 1;
+  }
+  render(); renderPanel();
+});
+svg.addEventListener("pointerdown", (e) => {
+  if (!draft || e.target.closest(".beacon, .nodo")) return;
+  // Clic en vacío: deselecciona / cancela arista en curso.
+  let cambio = selBaliza !== -1 || selNodo !== -1 || aristaOrigen !== null;
+  selBaliza = -1; selNodo = -1; aristaOrigen = null;
+  if (cambio) { render(); renderPanel(); }
+});
 
-// ─── Arrastre de balizas ───────────────────────────────────────────────────
-
-function bindBeacons() {
-  svg.querySelectorAll(".beacon").forEach(g => {
-    g.addEventListener("pointerdown", onDown);
-  });
-}
-
-let arrastrando = null;
-
+let arrastrando = null; // {tipo, i}
 function onDown(e) {
   e.preventDefault();
+  const tipo = e.currentTarget.dataset.tipo;
   const i = +e.currentTarget.dataset.i;
-  seleccion = i;
-  arrastrando = i;
-  // Captura sobre el <svg> (no el <g>): el render() reconstruye el
-  // contenido y destruiría la captura si estuviera en el círculo.
+
+  if (modo === 'aristas' && tipo === 'nodo') { conectarArista(nodos[i].id); return; }
+  if (modo === 'balizas' && tipo === 'baliza') { selBaliza = i; selNodo = -1; }
+  else if (modo === 'nodos' && tipo === 'nodo') { selNodo = i; selBaliza = -1; }
+  else { return; } // elemento de otro modo: ignorar
+
+  arrastrando = { tipo, i };
   svg.setPointerCapture(e.pointerId);
   svg.addEventListener("pointermove", onMove);
   svg.addEventListener("pointerup", onUp);
-  render();
+  render(); renderPanel();
 }
-
-function svgCoords(e) {
-  const ctm = svg.getScreenCTM().inverse();
-  const p = svg.createSVGPoint();
-  p.x = e.clientX; p.y = e.clientY;
-  const u = p.matrixTransform(ctm); // px del viewBox
-  return { x: u.x / PX + crop.minX, y: u.y / PX + crop.minY }; // metros del borrador
-}
-
 function onMove(e) {
-  if (arrastrando === null) return;
+  if (!arrastrando) return;
   const m = svgCoords(e);
-  const b = balizas[arrastrando];
-  b.x = r3(m.x);
-  b.y = r3(m.y);
+  const o = arrastrando.tipo === 'baliza' ? balizas[arrastrando.i] : nodos[arrastrando.i];
+  o.x = r3(m.x); o.y = r3(m.y);
   render();
   const tip = $("tooltip");
   tip.style.display = "block";
-  tip.style.left = e.clientX + "px";
-  tip.style.top = e.clientY + "px";
-  tip.textContent = `${b.x} m · ${b.y} m`;
-  setStatus(`Baliza ${b.minor}: (${b.x}, ${b.y}) m`);
+  tip.style.left = e.clientX + "px"; tip.style.top = e.clientY + "px";
+  tip.textContent = `${o.x} m · ${o.y} m`;
 }
-
 function onUp() {
   arrastrando = null;
   $("tooltip").style.display = "none";
   svg.removeEventListener("pointermove", onMove);
   svg.removeEventListener("pointerup", onUp);
+  renderPanel();
+}
+function conectarArista(idNodo) {
+  if (aristaOrigen === null) { aristaOrigen = idNodo; }
+  else if (aristaOrigen === idNodo) { aristaOrigen = null; }
+  else {
+    const existe = aristas.some(a =>
+      (a.origenId === aristaOrigen && a.destinoId === idNodo) ||
+      (a.origenId === idNodo && a.destinoId === aristaOrigen));
+    if (!existe) aristas.push({ origenId: aristaOrigen, destinoId: idNodo });
+    aristaOrigen = null;
+  }
+  render(); renderPanel();
+}
+function svgCoords(e) {
+  const ctm = svg.getScreenCTM().inverse();
+  const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  const u = p.matrixTransform(ctm);
+  return { x: u.x / PX + crop.minX, y: u.y / PX + crop.minY };
 }
 
-// ─── Panel de cuartos ──────────────────────────────────────────────────────
+// ─── Teclado: ajustar / borrar el seleccionado ───────────────────────────
+document.addEventListener("keydown", (e) => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  let o = null, arr = null, idx = -1;
+  if (modo === 'balizas' && selBaliza >= 0) { arr = balizas; idx = selBaliza; o = balizas[idx]; }
+  else if (modo === 'nodos' && selNodo >= 0) { arr = nodos; idx = selNodo; o = nodos[idx]; }
+  if (!o) return;
+  const paso = e.shiftKey ? 0.5 : 0.1;
+  switch (e.key) {
+    case "ArrowLeft":  o.x = r3(o.x - paso); break;
+    case "ArrowRight": o.x = r3(o.x + paso); break;
+    case "ArrowUp":    o.y = r3(o.y - paso); break;
+    case "ArrowDown":  o.y = r3(o.y + paso); break;
+    case "Delete": case "Backspace":
+      if (arr === nodos) aristas = aristas.filter(a => a.origenId !== o.id && a.destinoId !== o.id);
+      arr.splice(idx, 1);
+      if (arr === balizas) selBaliza = -1; else selNodo = -1;
+      break;
+    default: return;
+  }
+  e.preventDefault(); render(); renderPanel();
+});
 
+// ─── Panel de cuartos ────────────────────────────────────────────────────
 function renderCuartos() {
-  const cont = $("cuartos");
-  cont.innerHTML = "";
+  const cont = $("cuartos"); cont.innerHTML = "";
   for (const c of draft.cuartos) {
     const row = document.createElement("div");
     row.className = "cuarto";
     row.innerHTML = `<input type="checkbox" ${c.incluir ? "checked" : ""}>
-      <span>${c.nombre_sugerido}</span>
-      <small>${c.area_metros2} m²</small>`;
+      <span>${esc(c.nombre_sugerido)}</span><small>${c.area_metros2} m²</small>`;
     row.querySelector("input").addEventListener("change", (e) => {
-      c.incluir = e.target.checked;
-      recomputarCrop();
-      render();
+      c.incluir = e.target.checked; recomputarCrop(); render();
     });
     cont.appendChild(row);
   }
 }
 
-// ─── Panel de balizas ──────────────────────────────────────────────────────
-
-$("addBaliza").addEventListener("click", () => {
-  // Coloca en el centro del área incluida.
-  const cx = crop.minX + crop.ancho / 2;
-  const cy = crop.minY + crop.alto / 2;
-  balizas.push({ minor: nextMinor++, x: r3(cx), y: r3(cy), txPower: ESCALA, desc: "" });
-  seleccion = balizas.length - 1;
-  render();
-});
-
-function renderBalizasPanel() {
-  const cont = $("balizas");
-  if (!balizas.length) {
-    cont.innerHTML = `<div class="vacio">Sin balizas. Toca “Agregar baliza”.</div>`;
-    return;
-  }
-  cont.innerHTML = "";
-  balizas.forEach((b, i) => {
-    const d = document.createElement("div");
-    d.className = "balizaItem" + (i === seleccion ? " sel" : "");
-    d.innerHTML = `
-      <div class="top">
-        <b>Baliza ${b.minor}</b>
-        <button class="x" title="Eliminar">✕</button>
-      </div>
-      <div class="coords">x: ${b.x} m · y: ${b.y} m</div>
-      <div class="campo"><label>txPower</label><input type="number" value="${b.txPower}" step="1"></div>
-      <div class="campo"><label>Descrip.</label><input type="text" value="${b.desc}" placeholder="ej: pared norte"></div>`;
-    d.addEventListener("click", () => { seleccion = i; render(); });
-    d.querySelector(".x").addEventListener("click", (e) => {
-      e.stopPropagation();
-      balizas.splice(i, 1);
-      if (seleccion >= balizas.length) seleccion = balizas.length - 1;
-      render();
-    });
-    const [txp, desc] = d.querySelectorAll("input");
-    txp.addEventListener("change", (e) => { b.txPower = +e.target.value; });
-    desc.addEventListener("change", (e) => { b.desc = e.target.value; });
-    cont.appendChild(d);
-  });
+// ─── Panel por modo ──────────────────────────────────────────────────────
+function renderPanel() {
+  const p = $("panel");
+  if (modo === 'balizas') p.innerHTML = panelBalizas();
+  else if (modo === 'nodos') p.innerHTML = panelNodos();
+  else p.innerHTML = panelAristas();
+  cablearPanel();
 }
 
-// ─── Exportar ──────────────────────────────────────────────────────────────
+function panelBalizas() {
+  let h = `<h2>Balizas</h2>
+    <div class="barra" style="margin-bottom:6px"><button class="primary" id="addBaliza">+ Agregar baliza</button></div>
+    <p class="hintbox"><b>Doble clic</b> en el plano crea una baliza · <b>arrastra</b> para mover ·
+      <kbd>←→↑↓</kbd> ajustan · <kbd>Supr</kbd> borra.</p>`;
+  if (!balizas.length) return h + `<div class="vacio">Sin balizas.</div>`;
+  balizas.forEach((b, i) => {
+    h += `<div class="item ${i === selBaliza ? 'sel' : ''}" data-b="${i}">
+      <div class="top"><b>Baliza ${b.minor}</b><button class="x" data-delb="${i}">✕</button></div>
+      <div class="coords">x: ${b.x} · y: ${b.y} m</div>
+      <div class="campo"><label>txPower</label><input type="number" data-txp="${i}" value="${b.txPower}"></div>
+      <div class="campo"><label>Descrip.</label><input type="text" data-descb="${i}" value="${esc(b.desc)}"></div></div>`;
+  });
+  return h;
+}
 
+function panelNodos() {
+  let h = `<h2>Nodos del grafo</h2>
+    <p class="hintbox"><b>Doble clic</b> en el plano crea un nodo (en la puerta del salón, etc.) ·
+      <b>arrastra</b> para mover · edita su tipo y nombre abajo · <kbd>Supr</kbd> borra.</p>`;
+  if (selNodo >= 0) {
+    const n = nodos[selNodo];
+    h += `<div class="item sel">
+      <div class="campo"><label>Tipo</label><select data-ntipo>
+        ${TIPOS.map(t => `<option value="${t.c}" ${t.c === n.tipo ? 'selected' : ''}>${t.t}</option>`).join('')}
+      </select></div>
+      <div class="campo"><label>Nombre</label><input type="text" data-nnombre value="${esc(n.nombre)}" placeholder="ej: Salón 3-405"></div>
+      <div class="campo"><label>Accesible</label><input type="checkbox" data-nacc ${n.accesible ? 'checked' : ''}></div>
+      <div class="coords">x: ${n.x} · y: ${n.y} m · id ${n.id}</div></div>`;
+  }
+  h += `<h2 style="margin-top:14px">Lista (${nodos.length})</h2>`;
+  if (!nodos.length) return h + `<div class="vacio">Sin nodos.</div>`;
+  nodos.forEach((n, i) => {
+    const t = TIPOS.find(x => x.c === n.tipo);
+    h += `<div class="item ${i === selNodo ? 'sel' : ''}" data-n="${i}">
+      <div class="top">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorTipo(n.tipo)};margin-right:6px"></span>
+        ${esc(n.nombre || '(sin nombre)')} <small style="color:var(--mut)">${t ? t.t : n.tipo}</small></span>
+        <button class="x" data-deln="${i}">✕</button></div></div>`;
+  });
+  return h;
+}
+
+function panelAristas() {
+  let h = `<h2>Aristas (conexiones)</h2>
+    <p class="hintbox">Toca un <b>nodo</b> y luego otro para conectarlos. El grafo es no dirigido
+      (se conecta en ambos sentidos). Las aristas con escalera se marcan no accesibles al exportar.</p>`;
+  if (aristaOrigen) h += `<div class="hintbox" style="color:var(--brand)">Origen: ${esc(nombreNodo(aristaOrigen))} — toca el destino.</div>`;
+  h += `<h2 style="margin-top:8px">Lista (${aristas.length})</h2>`;
+  if (!aristas.length) return h + `<div class="vacio">Sin aristas.</div>`;
+  aristas.forEach((a, i) => {
+    h += `<div class="item"><div class="top">
+      <span>${esc(nombreNodo(a.origenId))} ↔ ${esc(nombreNodo(a.destinoId))}</span>
+      <button class="x" data-dela="${i}">✕</button></div></div>`;
+  });
+  return h;
+}
+function nombreNodo(id) { const n = nodos.find(x => x.id === id); return n ? (n.nombre || n.id) : id; }
+
+function cablearPanel() {
+  const add = $("addBaliza");
+  if (add) add.addEventListener("click", () => {
+    const cx = crop.minX + crop.ancho / 2, cy = crop.minY + crop.alto / 2;
+    balizas.push({ minor: nextMinor++, x: r3(cx), y: r3(cy), txPower: TXP, desc: "" });
+    selBaliza = balizas.length - 1; render(); renderPanel();
+  });
+  $("panel").querySelectorAll("[data-b]").forEach(el =>
+    el.addEventListener("click", (e) => { if (!e.target.closest("input,button")) { selBaliza = +el.dataset.b; render(); renderPanel(); } }));
+  $("panel").querySelectorAll("[data-delb]").forEach(el =>
+    el.addEventListener("click", () => { balizas.splice(+el.dataset.delb, 1); selBaliza = -1; render(); renderPanel(); }));
+  $("panel").querySelectorAll("[data-txp]").forEach(el =>
+    el.addEventListener("change", () => balizas[+el.dataset.txp].txPower = +el.value));
+  $("panel").querySelectorAll("[data-descb]").forEach(el =>
+    el.addEventListener("change", () => balizas[+el.dataset.descb].desc = el.value));
+
+  $("panel").querySelectorAll("[data-n]").forEach(el =>
+    el.addEventListener("click", (e) => { if (!e.target.closest("button")) { selNodo = +el.dataset.n; render(); renderPanel(); } }));
+  $("panel").querySelectorAll("[data-deln]").forEach(el =>
+    el.addEventListener("click", () => { const n = nodos[+el.dataset.deln]; aristas = aristas.filter(a => a.origenId !== n.id && a.destinoId !== n.id); nodos.splice(+el.dataset.deln, 1); selNodo = -1; render(); renderPanel(); }));
+  const tsel = $("panel").querySelector("[data-ntipo]");
+  if (tsel) tsel.addEventListener("change", () => { nodos[selNodo].tipo = tsel.value; render(); renderPanel(); });
+  const nnom = $("panel").querySelector("[data-nnombre]");
+  if (nnom) nnom.addEventListener("input", () => { nodos[selNodo].nombre = nnom.value; render(); });
+  const nacc = $("panel").querySelector("[data-nacc]");
+  if (nacc) nacc.addEventListener("change", () => nodos[selNodo].accesible = nacc.checked);
+
+  $("panel").querySelectorAll("[data-dela]").forEach(el =>
+    el.addEventListener("click", () => { aristas.splice(+el.dataset.dela, 1); render(); renderPanel(); }));
+}
+
+// ─── Exportar ────────────────────────────────────────────────────────────
 function descargar(nombre, texto, tipo) {
   const blob = new Blob([texto], { type: tipo });
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = nombre;
-  a.click();
+  a.href = URL.createObjectURL(blob); a.download = nombre; a.click();
   URL.revokeObjectURL(a.href);
 }
-
-$("expSvg").addEventListener("click", () => {
-  descargar("mapa.svg", generarSvg(), "image/svg+xml");
-  setStatus("mapa.svg descargado.");
-});
-
+$("expSvg").addEventListener("click", () => { descargar("mapa.svg", generarSvg(), "image/svg+xml"); setStatus("mapa.svg descargado."); });
+$("expGrafo").addEventListener("click", () => { descargar("grafo.json", generarGrafo(), "application/json"); setStatus(`grafo.json: ${nodos.length} nodos, ${aristas.length} aristas.`); });
 $("expBeacons").addEventListener("click", () => {
-  const dentro = balizasDentro();
+  const dentro = balizas.filter(b => { const x = b.x - crop.minX, y = b.y - crop.minY; return x >= 0 && x <= crop.ancho && y >= 0 && y <= crop.alto; });
   const cfg = {
     _descripcion: "Generado por tools/editor_mapa.html. Calibrar txPower y n en campo (/calibracion).",
-    uuid: UUID,
-    major: 1,
-    calibracion: {
-      txPower_dbm_default: -65, n_exponente_perdida: 3.5,
-      ventana_media_movil: 8, tolerancia_snap_metros: 3.0, expiracion_lectura_segundos: 3,
-    },
-    beacons: dentro.map(b => ({
-      minor: b.minor,
-      x: r3(b.x - crop.minX), y: r3(b.y - crop.minY),
-      txPower_dbm: b.txPower, descripcion: b.desc || "",
-    })),
+    uuid: UUID, major: +$("piso").value || 1,
+    calibracion: { txPower_dbm_default: -65, n_exponente_perdida: 3.5, ventana_media_movil: 8, tolerancia_snap_metros: 3.0, expiracion_lectura_segundos: 3 },
+    beacons: dentro.map(b => ({ minor: b.minor, x: r3(b.x - crop.minX), y: r3(b.y - crop.minY), txPower_dbm: b.txPower, descripcion: b.desc || "" })),
   };
   descargar("beacon_config.json", JSON.stringify(cfg, null, 2), "application/json");
-  setStatus(`beacon_config.json descargado (${dentro.length} balizas).`);
+  setStatus(`beacon_config.json: ${dentro.length} balizas.`);
 });
+
+function generarGrafo() {
+  const piso = +$("piso").value || 1;
+  const nds = nodos.map(n => ({ id: n.id, nombre: n.nombre || n.id, tipo: n.tipo, x: r3(n.x - crop.minX), y: r3(n.y - crop.minY), piso, accesible: n.accesible }));
+  const byId = Object.fromEntries(nodos.map(n => [n.id, n]));
+  const ars = aristas.filter(a => byId[a.origenId] && byId[a.destinoId]).map(a => {
+    const o = byId[a.origenId], d = byId[a.destinoId];
+    const dist = Math.sqrt((o.x - d.x) ** 2 + (o.y - d.y) ** 2);
+    const esEsc = o.tipo === 'ESCALERA' || d.tipo === 'ESCALERA';
+    return { origenId: a.origenId, destinoId: a.destinoId, distancia: r3(dist), tipoObstaculo: esEsc ? 'ESCALERA' : 'NINGUNO', accesible: !esEsc };
+  });
+  return JSON.stringify({
+    version: "1.0", piso, edificio: $("edificio").value || "FISC",
+    origen_descripcion: "Esquina superior izquierda, en metros",
+    mapa_svg: "assets/maps/mapa.svg",
+    mapa_ancho_metros: crop.ancho, mapa_alto_metros: crop.alto,
+    nodos: nds, aristas: ars,
+  }, null, 2);
+}
 
 function generarSvg() {
   const w = Math.round(crop.ancho * PX), h = Math.round(crop.alto * PX);
   const muros = geomRecortada(draft.paredes || []);
   const puertas = geomRecortada(draft.puertas || []);
   const ventanas = geomRecortada(draft.ventanas || []);
-  const dentro = balizasDentro();
+  const dentro = balizas.filter(b => { const x = b.x - crop.minX, y = b.y - crop.minY; return x >= 0 && x <= crop.ancho && y >= 0 && y <= crop.alto; });
   let s = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   s += `<!-- Generado por tools/editor_mapa.html desde un escaneo Polycam. -->\n`;
   s += `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">\n`;
-  s += `  <rect x="0" y="0" width="${w}" height="${h}" fill="#F5F0E6"/>\n`;
-  s += `  ${gridSvg(w, h)}\n`;
+  s += `  <rect x="0" y="0" width="${w}" height="${h}" fill="#F5F0E6"/>\n  ${gridSvg(w, h)}\n`;
   s += `  <g fill="#2C2C2A">\n`;
   for (const m of muros) s += `    <polygon points="${pts(m)}"/>\n`;
   s += `  </g>\n  <g fill="#F5F0E6" stroke="#2C2C2A" stroke-width="1.5">\n`;
@@ -533,15 +613,25 @@ function generarSvg() {
   s += `  </g>\n  <g fill="#F5F0E6" stroke="#5B7FA6" stroke-width="2">\n`;
   for (const v of ventanas) s += `    <polygon points="${pts(v)}"/>\n`;
   s += `  </g>\n`;
+  // Nodos del grafo (marcador por tipo + nombre de destinos).
+  if (nodos.length) {
+    s += `  <g font-family="sans-serif">\n`;
+    for (const n of nodos) {
+      const x = px(n.x), y = py(n.y);
+      s += `    <circle cx="${x}" cy="${y}" r="7" fill="${colorTipo(n.tipo)}" stroke="#fff" stroke-width="1.5"/>\n`;
+      if (n.nombre && n.tipo !== 'INTERSECCION')
+        s += `    <text x="${x}" y="${(+y - 11).toFixed(1)}" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">${esc(n.nombre)}</text>\n`;
+    }
+    s += `  </g>\n`;
+  }
+  // Balizas.
   if (dentro.length) {
     s += `  <g font-family="sans-serif">\n`;
     for (const b of dentro) {
-      const x = ((b.x - crop.minX) * PX).toFixed(1), y = ((b.y - crop.minY) * PX).toFixed(1);
-      s += `    <g transform="translate(${x},${y})">\n`;
-      s += `      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="1" opacity="0.35"/>\n`;
+      const x = px(b.x), y = py(b.y);
+      s += `    <g transform="translate(${x},${y})">\n      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="1" opacity="0.35"/>\n`;
       s += `      <circle r="10" fill="#1B4F72" stroke="#F5F0E6" stroke-width="2"/>\n`;
-      s += `      <text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${b.minor}</text>\n`;
-      s += `    </g>\n`;
+      s += `      <text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${b.minor}</text>\n    </g>\n`;
     }
     s += `  </g>\n`;
   }
@@ -550,8 +640,8 @@ function generarSvg() {
 }
 
 // ─── Utilidades ──────────────────────────────────────────────────────────
-
 function r3(v) { return Math.round(v * 1000) / 1000; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function setStatus(t) { $("status").textContent = t; }
 </script>
 </body>
