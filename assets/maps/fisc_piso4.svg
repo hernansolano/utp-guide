@@ -33,48 +33,4 @@
   <g fill="#F5F0E6" stroke="#5B7FA6" stroke-width="2">
     <polygon points="2299.1,144.0 2289.1,144.0 2289.1,429.0 2299.1,429.0 2299.1,144.0"/>
   </g>
-  <g font-family="sans-serif">
-    <circle cx="150.3" cy="577.6" r="7" fill="#3B82F6" stroke="#fff" stroke-width="1.5"/>
-    <text x="150.3" y="566.6" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">Salón SMART ROOM</text>
-    <circle cx="206.1" cy="24.4" r="7" fill="#3B82F6" stroke="#fff" stroke-width="1.5"/>
-    <text x="206.1" y="13.4" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">Salón 3-428</text>
-    <circle cx="817.4" cy="22.1" r="7" fill="#3B82F6" stroke="#fff" stroke-width="1.5"/>
-    <text x="817.4" y="11.1" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">Salón 3-427</text>
-    <circle cx="2231.9" cy="16.3" r="7" fill="#3B82F6" stroke="#fff" stroke-width="1.5"/>
-    <text x="2231.9" y="5.3" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">Salón 3-426</text>
-    <circle cx="2190.1" cy="570.7" r="7" fill="#3B82F6" stroke="#fff" stroke-width="1.5"/>
-    <text x="2190.1" y="559.7" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">Salón 3-425</text>
-    <circle cx="1154.5" cy="577.6" r="7" fill="#3B82F6" stroke="#fff" stroke-width="1.5"/>
-    <text x="1154.5" y="566.6" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">Salón 3-424</text>
-    <circle cx="635.0" cy="1738.7" r="7" fill="#06B6D4" stroke="#fff" stroke-width="1.5"/>
-    <text x="635.0" y="1727.7" font-size="13" font-weight="600" fill="#2C2C2A" text-anchor="middle">Baños Ala SE</text>
-    <circle cx="924.4" cy="571.8" r="7" fill="#94A3B8" stroke="#fff" stroke-width="1.5"/>
-  </g>
-  <g font-family="sans-serif">
-    <g transform="translate(1029.0,2867.3)">
-      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="1" opacity="0.35"/>
-      <circle r="10" fill="#1B4F72" stroke="#F5F0E6" stroke-width="2"/>
-      <text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">1</text>
-    </g>
-    <g transform="translate(29.4,280.1)">
-      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="1" opacity="0.35"/>
-      <circle r="10" fill="#1B4F72" stroke="#F5F0E6" stroke-width="2"/>
-      <text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">2</text>
-    </g>
-    <g transform="translate(2277.2,287.1)">
-      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="1" opacity="0.35"/>
-      <circle r="10" fill="#1B4F72" stroke="#F5F0E6" stroke-width="2"/>
-      <text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">3</text>
-    </g>
-    <g transform="translate(1008.1,582.3)">
-      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="1" opacity="0.35"/>
-      <circle r="10" fill="#1B4F72" stroke="#F5F0E6" stroke-width="2"/>
-      <text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">4</text>
-    </g>
-    <g transform="translate(654.7,1591.1)">
-      <circle r="16" fill="none" stroke="#1B4F72" stroke-width="1" opacity="0.35"/>
-      <circle r="10" fill="#1B4F72" stroke="#F5F0E6" stroke-width="2"/>
-      <text y="4" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">5</text>
-    </g>
-  </g>
 </svg>
