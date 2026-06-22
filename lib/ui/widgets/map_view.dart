@@ -337,11 +337,12 @@ class _MapViewState extends State<MapView>
     );
   }
 
-  /// Encuadra la ruta la PRIMERA vez que el layout entrega un tamaño válido.
-  /// Determinístico: corre una sola vez, post-frame, ya con `_boxSize` y
-  /// `_viewportSize` listos. Sustituye al encuadre frágil que la pantalla
-  /// disparaba durante la carga y que se perdía si el MapView no estaba
-  /// montado todavía. Si aún no hay ruta, encuadra todo el mapa (fallback).
+  /// Asegura que el mapa se vea COMPLETO (transform identidad) la primera vez
+  /// que el layout entrega un tamaño válido. Es el mismo estado de la pantalla
+  /// de exploración, que siempre se ve bien. Antes esto encuadraba a la ruta,
+  /// y ese encuadre dejaba el mapa fuera de pantalla ("en blanco") en la
+  /// pantalla de navegación. El usuario puede acercarse con pinch o con el
+  /// botón de ubicación.
   void _quizasEncuadreInicial() {
     if (_encuadreInicialHecho) return;
     final box = _boxSize;
@@ -352,7 +353,7 @@ class _MapViewState extends State<MapView>
     }
     _encuadreInicialHecho = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _encuadrarRuta(animado: false);
+      if (mounted) _encuadrarTodo(animado: false);
     });
   }
 
@@ -367,9 +368,9 @@ class _MapViewState extends State<MapView>
         final nuevoViewport = Size(
             viewportConstraints.maxWidth, viewportConstraints.maxHeight);
         // Si el viewport cambió de forma notable (rotación de pantalla u
-        // otro resize), re-encuadrar la ruta tras el frame. Sin esto la
-        // cámara conservaba el transform de la orientación anterior y el
-        // mapa quedaba descuadrado al rotar.
+        // otro resize), volver a mostrar el mapa completo tras el frame. Sin
+        // esto la cámara conservaba el transform de la orientación anterior y
+        // el mapa quedaba descuadrado al rotar.
         final cambioViewport = _viewportSize != null &&
             _encuadreInicialHecho &&
             ((_viewportSize!.width - nuevoViewport.width).abs() > 1 ||
@@ -377,7 +378,7 @@ class _MapViewState extends State<MapView>
         _viewportSize = nuevoViewport;
         if (cambioViewport) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _encuadrarRuta(animado: false);
+            if (mounted) _encuadrarTodo(animado: false);
           });
         }
 

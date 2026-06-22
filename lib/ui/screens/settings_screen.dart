@@ -158,16 +158,6 @@ class SettingsScreen extends StatelessWidget {
                               !modoSimulacionNotifier.value,
                         ),
                         _SettingsRow(
-                          icon: Icons.bug_report_outlined,
-                          title: 'Mostrar overlay de debug',
-                          sub:
-                              'Métricas en vivo de BLE y posicionamiento sobre el mapa.',
-                          toggle: true,
-                          value: debugOverlayNotifier.value,
-                          onToggle: () => debugOverlayNotifier.value =
-                              !debugOverlayNotifier.value,
-                        ),
-                        _SettingsRow(
                           icon: Icons.alt_route_rounded,
                           title: 'Snap-to-graph',
                           sub:

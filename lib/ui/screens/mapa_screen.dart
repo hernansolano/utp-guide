@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -153,7 +152,9 @@ class _MapaScreenState extends State<MapaScreen> {
 
       // Primera ruta: desde la entrada (aún no hay posición BLE). Cuando
       // llegue la primera lectura, el listener re-enruta desde el usuario.
-      await _recalcularRuta(perfil: _perfilActual, encuadrar: true);
+      // No auto-encuadramos: el mapa arranca mostrándose completo (como la
+      // pantalla de exploración) y la ruta se dibuja encima.
+      await _recalcularRuta(perfil: _perfilActual);
       if (mounted) setState(() => _cargando = false);
     } catch (e) {
       if (mounted) {
@@ -223,7 +224,7 @@ class _MapaScreenState extends State<MapaScreen> {
       // Re-enruta con el mismo origen actual (posición o entrada) pero el
       // nuevo perfil. Si falla (sin ruta accesible), `_recalcularRuta`
       // lanza sin tocar `_perfilActual` → se conserva la ruta anterior.
-      await _recalcularRuta(perfil: nuevoPerfil, encuadrar: true);
+      await _recalcularRuta(perfil: nuevoPerfil);
       if (mounted) setState(() => _recalculandoRuta = false);
     } catch (e) {
       if (!mounted) return;
@@ -734,30 +735,6 @@ class _MapaScreenState extends State<MapaScreen> {
                     child: MinimapWidget(ruta: _ruta, mapaSize: mapaSize),
                   ),
 
-                // Debug overlay (solo en debug builds + toggle).
-                if (kDebugMode)
-                  ValueListenableBuilder<bool>(
-                    valueListenable: widget.debugOverlayNotifier,
-                    builder: (context, mostrar, _) {
-                      if (!mostrar) return const SizedBox.shrink();
-                      return Positioned(
-                        top: MediaQuery.of(context).padding.top + 80,
-                        left: 16,
-                        // IgnorePointer: el cuadro es informativo. Sin
-                        // esto, su fondo opaco capturaba pans/taps en la
-                        // esquina y "rompía" el mapa en pantallas chicas.
-                        child: IgnorePointer(
-                          child: ValueListenableBuilder<Position?>(
-                            valueListenable: _posicionUsuarioNotifier,
-                            builder: (_, pos, _) => _DebugOverlay(
-                              positioningService: widget.positioningService,
-                              posicionSnapped: pos,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
               ],
             ),
           ),
@@ -1212,197 +1189,6 @@ class _FilaPaso extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── Overlay de debug (solo en builds de debug) ──────────────────────────────
-
-class _DebugOverlay extends StatelessWidget {
-  final PositioningService positioningService;
-  final Position? posicionSnapped;
-
-  const _DebugOverlay({
-    required this.positioningService,
-    required this.posicionSnapped,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final lecturas = positioningService.debugLecturas;
-    final posCruda = positioningService.debugPosicionCruda;
-
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 240),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'DEBUG · POSICIONAMIENTO',
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: Colors.white.withValues(alpha: 0.7),
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 6),
-          if (lecturas.isEmpty)
-            const Text(
-              'sin balizas',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                color: Colors.white60,
-              ),
-            )
-          else ...[
-            const _LineaDebug('minor   rssi      d       edad', isHeader: true),
-            ...lecturas.values.map((b) => _LineaBeacon(info: b)),
-          ],
-          const SizedBox(height: 8),
-          _LineaCoords(label: 'cruda', pos: posCruda, color: Colors.orange),
-          _LineaCoords(
-            label: 'snap ',
-            pos: posicionSnapped,
-            color: Colors.lightGreenAccent,
-          ),
-          if (posCruda != null && posicionSnapped != null) ...[
-            const SizedBox(height: 2),
-            _LineaDebug(
-              '|Δ| = ${_distancia(posCruda, posicionSnapped!).toStringAsFixed(2)} m',
-              color: Colors.white70,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  double _distancia(Position a, Position b) =>
-      sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2));
-}
-
-class _LineaDebug extends StatelessWidget {
-  final String texto;
-  final bool isHeader;
-  final Color color;
-
-  const _LineaDebug(
-    this.texto, {
-    this.isHeader = false,
-    this.color = Colors.white,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      texto,
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: isHeader ? 9 : 10,
-        fontWeight: isHeader ? FontWeight.w700 : FontWeight.w500,
-        color: isHeader ? color.withValues(alpha: 0.6) : color,
-      ),
-    );
-  }
-}
-
-class _LineaBeacon extends StatelessWidget {
-  final BeaconDebugInfo info;
-  const _LineaBeacon({required this.info});
-
-  @override
-  Widget build(BuildContext context) {
-    final edad = info.edadMs;
-    final Color colorEdad;
-    if (edad < 1000) {
-      colorEdad = Colors.lightGreenAccent;
-    } else if (edad < 2000) {
-      colorEdad = Colors.amberAccent;
-    } else {
-      colorEdad = Colors.redAccent;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 30,
-            child: Text(
-              info.minor.toString().padLeft(3),
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 50,
-            child: Text(
-              '${info.rssi.toStringAsFixed(0).padLeft(4)}dBm',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 50,
-            child: Text(
-              '${info.distanciaEstimada.toStringAsFixed(1).padLeft(4)}m',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          Text(
-            '${edad}ms',
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 10,
-              color: colorEdad,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LineaCoords extends StatelessWidget {
-  final String label;
-  final Position? pos;
-  final Color color;
-
-  const _LineaCoords({
-    required this.label,
-    required this.pos,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final texto = pos == null
-        ? '$label  —'
-        : '$label  (${pos!.x.toStringAsFixed(2)}, '
-              '${pos!.y.toStringAsFixed(2)})';
-    return Text(
-      texto,
-      style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: color),
     );
   }
 }
