@@ -33,6 +33,7 @@ Los ADRs son **inmutables**. Si una decisión se revierte o evoluciona, se crea 
 | [0009](0009-pinning-dependencias.md) | Política de pinning de dependencias y auditoría de seguridad | aceptado | 2026-05-20 |
 | [0010](0010-map-view-widget.md) | MapView: widget de mapa con cámara controlable y fix de coordenadas | aceptado | 2026-05-21 |
 | [0011](0011-calibracion-en-campo.md) | Pantalla de calibración en campo con ajustes en vivo | aceptado | 2026-05-27 |
+| [0012](0012-pipeline-importacion-mapas.md) | Pipeline de importación de mapas (DXF → SVG + grafo) | aceptado | 2026-06-22 |
 
 ## Cómo crear un nuevo ADR
 
