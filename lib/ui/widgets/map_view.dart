@@ -222,8 +222,12 @@ class _MapViewState extends State<MapView>
     final bboxBoxH = bboxH * box.height / widget.mapaSize.height;
 
     // Escala para que la bbox quepa en el viewport (la menor de las dos).
+    // Tope de encuadre por debajo de maxZoom: una ruta corta no debe saltar
+    // a 6x (se vería un acercamiento extremo); el usuario igual puede hacer
+    // pinch hasta maxZoom manualmente.
+    final double zoomMax = min(widget.maxZoom, _zoomMaxEncuadre);
     final escala = min(viewport.width / bboxBoxW, viewport.height / bboxBoxH)
-        .clamp(widget.minZoom, widget.maxZoom);
+        .clamp(widget.minZoom, zoomMax);
 
     _moverCamaraA(centerWorld, zoomDeseado: escala, animado: animado);
   }
@@ -244,22 +248,30 @@ class _MapViewState extends State<MapView>
       return;
     }
 
-    // Mundo (metros) → pixel dentro del box.
-    final puntoBox = Offset(
-      puntoMundo.dx * box.width / widget.mapaSize.width,
-      puntoMundo.dy * box.height / widget.mapaSize.height,
+    // Mundo (metros) → pixel dentro de la ESCENA del InteractiveViewer.
+    // El rectángulo del mapa (AspectRatio) está CENTRADO dentro del viewport
+    // (Center), así que su origen no coincide con el de la escena: hay que
+    // sumar el offset de centrado `(viewport - box) / 2`. Sin esto, el
+    // encuadre desplazaba el contenido por `offset * escala` y lo mandaba
+    // fuera de pantalla cuando el aspect del mapa difiere del viewport
+    // (causa del "mapa en blanco" en la pantalla de navegación).
+    final offsetX = (viewport.width - box.width) / 2;
+    final offsetY = (viewport.height - box.height) / 2;
+    final puntoEscena = Offset(
+      puntoMundo.dx * box.width / widget.mapaSize.width + offsetX,
+      puntoMundo.dy * box.height / widget.mapaSize.height + offsetY,
     );
 
     final escala = (zoomDeseado ?? _zoomActual)
         .clamp(widget.minZoom, widget.maxZoom);
 
-    // Matrix tal que escala * (p - puntoBox) + viewportCenter = puntoBox transformado en viewportCenter
-    // Equivalente: translate(viewportCenter) * scale * translate(-puntoBox)
+    // Matrix = translate(viewportCenter) * scale * translate(-puntoEscena):
+    // el punto de la escena queda exactamente en el centro del viewport.
     // Usamos translateByDouble/scaleByDouble (las versiones no-deprecadas).
     final matrix = Matrix4.identity()
       ..translateByDouble(viewport.width / 2, viewport.height / 2, 0, 1)
       ..scaleByDouble(escala, escala, escala, 1)
-      ..translateByDouble(-puntoBox.dx, -puntoBox.dy, 0, 1);
+      ..translateByDouble(-puntoEscena.dx, -puntoEscena.dy, 0, 1);
 
     _animarMatrix(matrix, animado: animado);
   }
@@ -465,6 +477,11 @@ class _MapViewState extends State<MapView>
 
   /// Padding alrededor de la ruta al encuadrarla, en metros.
   static const double _paddingMetros = 1.5;
+
+  /// Zoom máximo al que llega el encuadre automático de la ruta. Más bajo
+  /// que `maxZoom` (el tope del pinch manual) para que una ruta corta no
+  /// abra con un acercamiento extremo.
+  static const double _zoomMaxEncuadre = 2.5;
 }
 
 /// Cruz roja para indicar la posición virtual en modo simulación.
