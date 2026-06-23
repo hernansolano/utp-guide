@@ -63,6 +63,13 @@ class _ResearchHomeScreenState extends State<ResearchHomeScreen> {
   Future<void> _exportar(ExperimentType tipo) async {
     if (_exportando) return;
     setState(() => _exportando = true);
+    // iOS/iPad exigen un rect ancla no-cero para el share sheet; lo tomamos
+    // del render box de la pantalla (antes de los await, con el contexto
+    // todavía válido). Sin esto: PlatformException al compartir el CSV.
+    final box = context.findRenderObject() as RenderBox?;
+    final origenShare = (box != null && box.hasSize)
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
     try {
       final sesiones = await widget.repository.listar(tipo: tipo);
       if (sesiones.isEmpty) {
@@ -74,7 +81,8 @@ class _ResearchHomeScreenState extends State<ResearchHomeScreen> {
         }
         return;
       }
-      final filas = await widget.exporter.exportarYCompartir(sesiones, tipo);
+      final filas = await widget.exporter
+          .exportarYCompartir(sesiones, tipo, sharePositionOrigin: origenShare);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('${tipo.codigo}: $filas filas exportadas.'),

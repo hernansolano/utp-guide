@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show Rect;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/measurement_session.dart';
@@ -9,8 +10,14 @@ import '../models/measurement_session.dart';
 class ResearchExporter {
   /// Escribe el CSV del [tipo] a un archivo temporal y abre el share.
   /// Devuelve la cantidad de filas de datos exportadas.
+  ///
+  /// [sharePositionOrigin]: rect ancla del share sheet. En iOS/iPad es
+  /// **obligatorio** y debe ser no-cero; sin él, `Share` lanza
+  /// `PlatformException(sharePositionOrigin: argument must be set...)`. El
+  /// llamador lo calcula desde el `RenderBox` del contexto del botón.
   Future<int> exportarYCompartir(
-      List<MeasurementSession> sesiones, ExperimentType tipo) async {
+      List<MeasurementSession> sesiones, ExperimentType tipo,
+      {Rect? sharePositionOrigin}) async {
     final (csv, filas) = tipo == ExperimentType.exp1Propagacion
         ? _csvExp1(sesiones)
         : _csvExp2(sesiones);
@@ -24,6 +31,7 @@ class ResearchExporter {
       [XFile(f.path, mimeType: 'text/csv')],
       text: 'Datos ${tipo.codigo} — UTP-Guide (JIC 2026)',
       subject: nombre,
+      sharePositionOrigin: sharePositionOrigin,
     );
     return filas;
   }
