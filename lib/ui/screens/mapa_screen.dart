@@ -39,7 +39,6 @@ class MapaScreen extends StatefulWidget {
   final TtsService ttsService;
   final TrazaService trazaService;
   final ValueNotifier<bool> arAutomaticoNotifier;
-  final ValueNotifier<bool> debugOverlayNotifier;
   final ValueNotifier<bool> modoSimulacionNotifier;
   final ValueNotifier<Position?> posicionVirtualNotifier;
   final ValueNotifier<bool> vozHabilitadaNotifier;
@@ -54,7 +53,6 @@ class MapaScreen extends StatefulWidget {
     required this.ttsService,
     required this.trazaService,
     required this.arAutomaticoNotifier,
-    required this.debugOverlayNotifier,
     required this.modoSimulacionNotifier,
     required this.posicionVirtualNotifier,
     required this.vozHabilitadaNotifier,

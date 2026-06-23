@@ -50,6 +50,7 @@ class _Exp2ScreenState extends State<Exp2Screen> {
   _Fase _fase = _Fase.config;
   Size? _dims;
   String? _svg;
+  int _piso = 1;
   List<PositioningAlgorithm> _algos = [];
 
   Position? _real;
@@ -79,6 +80,7 @@ class _Exp2ScreenState extends State<Exp2Screen> {
   Future<void> _cargar() async {
     final dims = await widget.grafoRepository.obtenerDimensionesMapa();
     final svg = await widget.grafoRepository.obtenerMapaSvgPath();
+    final piso = await widget.grafoRepository.obtenerPiso();
     final cal = await widget.beaconRepository.obtenerCalibracion();
     final beacons = await widget.beaconRepository.obtenerTodosLosBeacons();
     final mapa = <int, BeaconPos>{
@@ -88,13 +90,14 @@ class _Exp2ScreenState extends State<Exp2Screen> {
     setState(() {
       _dims = Size(dims.anchoMetros, dims.altoMetros);
       _svg = svg;
-      _algos = _construirAlgos(mapa, cal);
+      _piso = piso;
+      _algos = _construirAlgos(mapa, cal, piso);
     });
   }
 
   List<PositioningAlgorithm> _construirAlgos(
-          Map<int, BeaconPos> mapa, CalibracionPositioning cal) =>
-      [CentroideMovil(mapa, cal), CentroideKalman(mapa, cal)];
+          Map<int, BeaconPos> mapa, CalibracionPositioning cal, int piso) =>
+      [CentroideMovil(mapa, cal, piso), CentroideKalman(mapa, cal, piso)];
 
   @override
   void dispose() {
@@ -241,8 +244,8 @@ class _Exp2ScreenState extends State<Exp2Screen> {
           posicionTarget: _real,
           panZoomHabilitado: false,
           onTapMundo: tap
-              ? (m) => setState(() => _real =
-                  Position(x: m.dx, y: m.dy, piso: 1, timestamp: DateTime.now()))
+              ? (m) => setState(() => _real = Position(
+                  x: m.dx, y: m.dy, piso: _piso, timestamp: DateTime.now()))
               : null,
         ),
       ),

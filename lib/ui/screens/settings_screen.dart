@@ -20,7 +20,6 @@ class SettingsScreen extends StatelessWidget {
   final ValueNotifier<bool> vozHabilitadaNotifier;
   final ValueNotifier<bool> textoGrandeNotifier;
   final ValueNotifier<bool> arAutomaticoNotifier;
-  final ValueNotifier<bool> debugOverlayNotifier;
   final ValueNotifier<bool> modoSimulacionNotifier;
   final ValueNotifier<bool> snapHabilitadoNotifier;
   final ValueNotifier<bool> trazaActivaNotifier;
@@ -32,7 +31,6 @@ class SettingsScreen extends StatelessWidget {
     required this.vozHabilitadaNotifier,
     required this.textoGrandeNotifier,
     required this.arAutomaticoNotifier,
-    required this.debugOverlayNotifier,
     required this.modoSimulacionNotifier,
     required this.snapHabilitadoNotifier,
     required this.trazaActivaNotifier,
@@ -57,7 +55,6 @@ class SettingsScreen extends StatelessWidget {
                 vozHabilitadaNotifier,
                 textoGrandeNotifier,
                 arAutomaticoNotifier,
-                debugOverlayNotifier,
                 modoSimulacionNotifier,
                 snapHabilitadoNotifier,
                 trazaActivaNotifier,

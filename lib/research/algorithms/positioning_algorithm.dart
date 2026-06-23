@@ -65,9 +65,10 @@ class _EstadoBaliza {
 abstract class _CentroideBase implements PositioningAlgorithm {
   final Map<int, BeaconPos> balizas;
   final CalibracionPositioning cal;
+  final int piso;
   final Map<int, _EstadoBaliza> _estados = {};
 
-  _CentroideBase(this.balizas, this.cal);
+  _CentroideBase(this.balizas, this.cal, this.piso);
 
   double _txPower(int minor) =>
       balizas[minor]?.txPowerDbm ?? cal.txPowerDbmDefault;
@@ -105,7 +106,7 @@ abstract class _CentroideBase implements PositioningAlgorithm {
     });
     if (sw == 0) return null;
     return Position(
-        x: sx / sw, y: sy / sw, piso: 1, timestamp: DateTime.now());
+        x: sx / sw, y: sy / sw, piso: piso, timestamp: DateTime.now());
   }
 
   @override
@@ -117,7 +118,7 @@ abstract class _CentroideBase implements PositioningAlgorithm {
 class CentroideMovil extends _CentroideBase {
   final Map<int, Queue<double>> _ventanas = {};
 
-  CentroideMovil(super.balizas, super.cal);
+  CentroideMovil(super.balizas, super.cal, super.piso);
 
   @override
   String get nombre => 'centroide_movil';
@@ -150,7 +151,8 @@ class CentroideKalman extends _CentroideBase {
   final double r;
   final Map<int, Kalman1D> _filtros = {};
 
-  CentroideKalman(super.balizas, super.cal, {this.q = 0.01, this.r = 4.0});
+  CentroideKalman(super.balizas, super.cal, super.piso,
+      {this.q = 0.01, this.r = 4.0});
 
   @override
   String get nombre => 'centroide_kalman';

@@ -47,12 +47,6 @@ final vozHabilitadaNotifier         = ValueNotifier<bool>(false);
 final textoGrandeNotifier           = ValueNotifier<bool>(false);
 final arAutomaticoNotifier          = ValueNotifier<bool>(true);
 
-/// Overlay de debug sobre el mapa (RSSI, balizas, coords cruda/snap).
-/// Default `false`: UI limpia al abrir en cualquier build. El dev lo
-/// enciende cuando lo necesita desde Ajustes → Desarrollador. El cuadro
-/// nunca captura gestos (va envuelto en `IgnorePointer` en MapaScreen).
-final debugOverlayNotifier          = ValueNotifier<bool>(false);
-
 /// Si false, `PositioningService` no aplica snap-to-graph y emite la
 /// posición cruda del centroide ponderado. Útil para calibrar: ver el
 /// dot saltando "donde el sistema cree" sin que las aristas del grafo
@@ -147,7 +141,6 @@ final _router = GoRouter(
           ttsService: _ttsService,
           trazaService: _trazaService,
           arAutomaticoNotifier: arAutomaticoNotifier,
-          debugOverlayNotifier: debugOverlayNotifier,
           modoSimulacionNotifier: modoSimulacionNotifier,
           posicionVirtualNotifier: posicionVirtualNotifier,
           vozHabilitadaNotifier: vozHabilitadaNotifier,
@@ -173,7 +166,6 @@ final _router = GoRouter(
         vozHabilitadaNotifier: vozHabilitadaNotifier,
         textoGrandeNotifier: textoGrandeNotifier,
         arAutomaticoNotifier: arAutomaticoNotifier,
-        debugOverlayNotifier: debugOverlayNotifier,
         modoSimulacionNotifier: modoSimulacionNotifier,
         snapHabilitadoNotifier: snapHabilitadoNotifier,
         trazaActivaNotifier: trazaActivaNotifier,
