@@ -2,18 +2,18 @@
   "version": "1.0",
   "piso": 4,
   "edificio": "FISC",
-  "origen_descripcion": "Esquina superior izquierda, en metros",
+  "origen_descripcion": "Esquina superior izquierda (NO), en metros",
   "mapa_svg": "assets/maps/fisc_piso4_pasillo.svg",
-  "mapa_ancho_metros": 23.09,
-  "mapa_alto_metros": 6.2,
-  "_nota": "EXP2 pasillo arriba - 4 balizas (rectángulo).",
+  "mapa_ancho_metros": 23.19,
+  "mapa_alto_metros": 5.72,
+  "_nota": "4 balizas, rectángulo compacto (23.19 x 5.72 m real).",
   "nodos": [
     {
       "id": "entrada_oeste",
       "nombre": "Entrada oeste",
       "tipo": "ENTRADA",
-      "x": 0.6,
-      "y": 4.85,
+      "x": 0.5,
+      "y": 2.86,
       "piso": 4,
       "accesible": true
     },
@@ -21,8 +21,8 @@
       "id": "p1",
       "nombre": "Pasillo p1",
       "tipo": "INTERSECCION",
-      "x": 1.8,
-      "y": 2.9,
+      "x": 4.0,
+      "y": 2.86,
       "piso": 4,
       "accesible": true
     },
@@ -30,8 +30,8 @@
       "id": "p2",
       "nombre": "Pasillo p2",
       "tipo": "INTERSECCION",
-      "x": 5.0,
-      "y": 2.9,
+      "x": 8.0,
+      "y": 2.86,
       "piso": 4,
       "accesible": true
     },
@@ -39,8 +39,8 @@
       "id": "p3",
       "nombre": "Pasillo p3",
       "tipo": "INTERSECCION",
-      "x": 8.2,
-      "y": 2.9,
+      "x": 11.6,
+      "y": 2.86,
       "piso": 4,
       "accesible": true
     },
@@ -48,8 +48,8 @@
       "id": "p4",
       "nombre": "Pasillo p4",
       "tipo": "INTERSECCION",
-      "x": 9.5,
-      "y": 2.9,
+      "x": 16.0,
+      "y": 2.86,
       "piso": 4,
       "accesible": true
     },
@@ -57,107 +57,8 @@
       "id": "p5",
       "nombre": "Pasillo p5",
       "tipo": "INTERSECCION",
-      "x": 11.5,
-      "y": 2.9,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p6",
-      "nombre": "Pasillo p6",
-      "tipo": "INTERSECCION",
-      "x": 14.5,
-      "y": 2.9,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p7",
-      "nombre": "Pasillo p7",
-      "tipo": "INTERSECCION",
-      "x": 17.5,
-      "y": 2.9,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p8",
-      "nombre": "Pasillo p8",
-      "tipo": "INTERSECCION",
       "x": 20.0,
-      "y": 2.9,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p9",
-      "nombre": "Pasillo p9",
-      "tipo": "INTERSECCION",
-      "x": 22.2,
-      "y": 2.9,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "n10",
-      "nombre": "Pasillo sur",
-      "tipo": "INTERSECCION",
-      "x": 9.244,
-      "y": 5.718,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "n1",
-      "nombre": "Salón 3-424",
-      "tipo": "SALON",
-      "x": 1.503,
-      "y": 5.776,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "n2",
-      "nombre": "Salón 3-425",
-      "tipo": "SALON",
-      "x": 2.061,
-      "y": 0.244,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "n3",
-      "nombre": "Salón 3-426",
-      "tipo": "SALON",
-      "x": 8.174,
-      "y": 0.221,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "n4",
-      "nombre": "Salón 3-427",
-      "tipo": "SALON",
-      "x": 22.319,
-      "y": 0.163,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "n5",
-      "nombre": "Salón 3-428",
-      "tipo": "SALON",
-      "x": 21.901,
-      "y": 5.707,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "n6",
-      "nombre": "Salón 3-423",
-      "tipo": "SALON",
-      "x": 11.545,
-      "y": 5.776,
+      "y": 2.86,
       "piso": 4,
       "accesible": true
     }
@@ -166,112 +67,35 @@
     {
       "origenId": "entrada_oeste",
       "destinoId": "p1",
-      "distancia": 2.29,
+      "distancia": 3.5,
       "tipoObstaculo": "NINGUNO",
       "accesible": true
     },
     {
       "origenId": "p1",
       "destinoId": "p2",
-      "distancia": 3.2,
+      "distancia": 4.0,
       "tipoObstaculo": "NINGUNO",
       "accesible": true
     },
     {
       "origenId": "p2",
       "destinoId": "p3",
-      "distancia": 3.2,
+      "distancia": 3.6,
       "tipoObstaculo": "NINGUNO",
       "accesible": true
     },
     {
       "origenId": "p3",
       "destinoId": "p4",
-      "distancia": 1.3,
+      "distancia": 4.4,
       "tipoObstaculo": "NINGUNO",
       "accesible": true
     },
     {
       "origenId": "p4",
       "destinoId": "p5",
-      "distancia": 2.0,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p5",
-      "destinoId": "p6",
-      "distancia": 3.0,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p6",
-      "destinoId": "p7",
-      "distancia": 3.0,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p7",
-      "destinoId": "p8",
-      "distancia": 2.5,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p8",
-      "destinoId": "p9",
-      "distancia": 2.2,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "n10",
-      "destinoId": "p4",
-      "distancia": 2.83,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "n1",
-      "destinoId": "entrada_oeste",
-      "distancia": 1.29,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "n2",
-      "destinoId": "p1",
-      "distancia": 2.67,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "n3",
-      "destinoId": "p3",
-      "distancia": 2.68,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "n4",
-      "destinoId": "p9",
-      "distancia": 2.74,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "n5",
-      "destinoId": "p9",
-      "distancia": 2.82,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "n6",
-      "destinoId": "n10",
-      "distancia": 2.3,
+      "distancia": 4.0,
       "tipoObstaculo": "NINGUNO",
       "accesible": true
     }

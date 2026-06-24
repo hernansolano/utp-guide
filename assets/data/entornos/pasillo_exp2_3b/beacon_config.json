@@ -1,5 +1,5 @@
 {
-  "_descripcion": "EXP2 pasillo, 3 balizas en triángulo compacto central. Calib EXP1.",
+  "_descripcion": "3 balizas, triángulo CENTRADO (23.19 x 5.72 m real).",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 4,
   "calibracion": {
@@ -12,22 +12,22 @@
   "beacons": [
     {
       "minor": 1,
-      "x": 7.0,
+      "x": 8.0,
       "y": 0.3,
       "txPower_dbm": -59,
       "descripcion": "Pasillo B1"
     },
     {
       "minor": 2,
-      "x": 16.0,
+      "x": 15.0,
       "y": 0.3,
       "txPower_dbm": -59,
       "descripcion": "Pasillo B2"
     },
     {
       "minor": 3,
-      "x": 12.5,
-      "y": 5.6,
+      "x": 11.6,
+      "y": 5.4,
       "txPower_dbm": -59,
       "descripcion": "Pasillo B3"
     }

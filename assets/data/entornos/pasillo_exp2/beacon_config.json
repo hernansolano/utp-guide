@@ -1,5 +1,5 @@
 {
-  "_descripcion": "EXP2 pasillo, 4 balizas en rectángulo compacto central (~9 m). Calib EXP1.",
+  "_descripcion": "4 balizas, rectángulo compacto (23.19 x 5.72 m real).",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 4,
   "calibracion": {
@@ -27,14 +27,14 @@
     {
       "minor": 3,
       "x": 7.0,
-      "y": 5.6,
+      "y": 5.4,
       "txPower_dbm": -59,
       "descripcion": "Pasillo B3"
     },
     {
       "minor": 4,
       "x": 16.0,
-      "y": 5.6,
+      "y": 5.4,
       "txPower_dbm": -59,
       "descripcion": "Pasillo B4"
     }
