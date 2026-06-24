@@ -1,0 +1,56 @@
+{
+  "_descripcion": "PARCIAL piso 4 (ala derecha). Balizas propuestas en zigzag.",
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "major": 4,
+  "calibracion": {
+    "txPower_dbm_default": -65,
+    "n_exponente_perdida": 3.5,
+    "ventana_media_movil": 8,
+    "tolerancia_snap_metros": 3.0,
+    "expiracion_lectura_segundos": 3
+  },
+  "beacons": [
+    {
+      "minor": 1,
+      "x": 75,
+      "y": 4.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 1"
+    },
+    {
+      "minor": 2,
+      "x": 90,
+      "y": 4.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 2"
+    },
+    {
+      "minor": 3,
+      "x": 104,
+      "y": 4.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 3"
+    },
+    {
+      "minor": 4,
+      "x": 78,
+      "y": 9.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 4"
+    },
+    {
+      "minor": 5,
+      "x": 93,
+      "y": 9.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 5"
+    },
+    {
+      "minor": 6,
+      "x": 102,
+      "y": 9.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 6"
+    }
+  ]
+}

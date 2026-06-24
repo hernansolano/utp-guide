@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "piso": 99,
+  "edificio": "AULA_PRUEBA",
+  "origen_descripcion": "Esquina superior izquierda, en metros",
+  "mapa_svg": "assets/maps/aula_prueba_balizas.svg",
+  "mapa_ancho_metros": 8.04,
+  "mapa_alto_metros": 7.29,
+  "_nota": "Aula de prueba 8x7. major 99 (no es un piso real).",
+  "nodos": [
+    {
+      "id": "entrada",
+      "nombre": "Puerta P-01",
+      "tipo": "ENTRADA",
+      "x": 1.37,
+      "y": 0.2,
+      "piso": 99,
+      "accesible": true
+    },
+    {
+      "id": "centro",
+      "nombre": "Puesto de prueba",
+      "tipo": "INTERSECCION",
+      "x": 4.02,
+      "y": 3.65,
+      "piso": 99,
+      "accesible": true
+    },
+    {
+      "id": "fondo",
+      "nombre": "Fondo del aula",
+      "tipo": "SALON",
+      "x": 4.02,
+      "y": 6.8,
+      "piso": 99,
+      "accesible": true
+    }
+  ],
+  "aristas": [
+    {
+      "origenId": "entrada",
+      "destinoId": "centro",
+      "distancia": 4.35,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "centro",
+      "destinoId": "fondo",
+      "distancia": 3.15,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    }
+  ]
+}

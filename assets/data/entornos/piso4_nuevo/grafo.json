@@ -1,0 +1,263 @@
+{
+  "version": "1.0",
+  "piso": 4,
+  "edificio": "FISC",
+  "origen_descripcion": "Esquina superior izquierda, en metros",
+  "mapa_svg": "assets/maps/plano_piso4_app.svg",
+  "mapa_ancho_metros": 109.54,
+  "mapa_alto_metros": 60.26,
+  "_nota": "PARCIAL: solo ala derecha (salones 401-410). Faltan las demás alas.",
+  "nodos": [
+    {
+      "id": "entrada_ala_este",
+      "nombre": "Entrada (ala este)",
+      "tipo": "ENTRADA",
+      "x": 70.0,
+      "y": 6.6,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "p1",
+      "nombre": "Pasillo · p1",
+      "tipo": "INTERSECCION",
+      "x": 73.0,
+      "y": 6.6,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "p2",
+      "nombre": "Pasillo · p2",
+      "tipo": "INTERSECCION",
+      "x": 80.0,
+      "y": 6.6,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "p3",
+      "nombre": "Pasillo · p3",
+      "tipo": "INTERSECCION",
+      "x": 88.0,
+      "y": 6.6,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "p4",
+      "nombre": "Pasillo · p4",
+      "tipo": "INTERSECCION",
+      "x": 96.0,
+      "y": 6.6,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "p5",
+      "nombre": "Pasillo · p5",
+      "tipo": "INTERSECCION",
+      "x": 104.0,
+      "y": 6.6,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s402",
+      "nombre": "Salón 402",
+      "tipo": "SALON",
+      "x": 73.1,
+      "y": 5.5,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s401",
+      "nombre": "Salón 401",
+      "tipo": "SALON",
+      "x": 80.7,
+      "y": 5.5,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s403",
+      "nombre": "Salón 403",
+      "tipo": "SALON",
+      "x": 88.4,
+      "y": 5.5,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s404",
+      "nombre": "Salón 404",
+      "tipo": "SALON",
+      "x": 96.6,
+      "y": 5.5,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s405",
+      "nombre": "Salón 405",
+      "tipo": "SALON",
+      "x": 103.9,
+      "y": 5.5,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s410",
+      "nombre": "Salón 410",
+      "tipo": "SALON",
+      "x": 73.2,
+      "y": 7.7,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s409",
+      "nombre": "Salón 409",
+      "tipo": "SALON",
+      "x": 80.9,
+      "y": 7.7,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s408",
+      "nombre": "Salón 408",
+      "tipo": "SALON",
+      "x": 88.4,
+      "y": 7.7,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s407",
+      "nombre": "Salón 407",
+      "tipo": "SALON",
+      "x": 96.7,
+      "y": 7.7,
+      "piso": 4,
+      "accesible": true
+    },
+    {
+      "id": "s407b",
+      "nombre": "Salón 407-B",
+      "tipo": "SALON",
+      "x": 103.9,
+      "y": 7.7,
+      "piso": 4,
+      "accesible": true
+    }
+  ],
+  "aristas": [
+    {
+      "origenId": "entrada_ala_este",
+      "destinoId": "p1",
+      "distancia": 3.0,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "p1",
+      "destinoId": "p2",
+      "distancia": 7.0,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "p2",
+      "destinoId": "p3",
+      "distancia": 8.0,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "p3",
+      "destinoId": "p4",
+      "distancia": 8.0,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "p4",
+      "destinoId": "p5",
+      "distancia": 8.0,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s402",
+      "destinoId": "p1",
+      "distancia": 1.1,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s401",
+      "destinoId": "p2",
+      "distancia": 1.3,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s403",
+      "destinoId": "p3",
+      "distancia": 1.17,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s404",
+      "destinoId": "p4",
+      "distancia": 1.25,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s405",
+      "destinoId": "p5",
+      "distancia": 1.1,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s410",
+      "destinoId": "p1",
+      "distancia": 1.12,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s409",
+      "destinoId": "p2",
+      "distancia": 1.42,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s408",
+      "destinoId": "p3",
+      "distancia": 1.17,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s407",
+      "destinoId": "p4",
+      "distancia": 1.3,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    },
+    {
+      "origenId": "s407b",
+      "destinoId": "p5",
+      "distancia": 1.1,
+      "tipoObstaculo": "NINGUNO",
+      "accesible": true
+    }
+  ]
+}

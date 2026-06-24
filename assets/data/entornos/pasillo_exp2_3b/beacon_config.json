@@ -1,0 +1,35 @@
+{
+  "_descripcion": "EXP2 pasillo, 3 balizas en triángulo compacto central.",
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "major": 4,
+  "calibracion": {
+    "txPower_dbm_default": -65,
+    "n_exponente_perdida": 3.5,
+    "ventana_media_movil": 8,
+    "tolerancia_snap_metros": 3.0,
+    "expiracion_lectura_segundos": 3
+  },
+  "beacons": [
+    {
+      "minor": 1,
+      "x": 7.0,
+      "y": 0.3,
+      "txPower_dbm": -65,
+      "descripcion": "Pasillo B1"
+    },
+    {
+      "minor": 2,
+      "x": 16.0,
+      "y": 0.3,
+      "txPower_dbm": -65,
+      "descripcion": "Pasillo B2"
+    },
+    {
+      "minor": 3,
+      "x": 12.5,
+      "y": 5.6,
+      "txPower_dbm": -65,
+      "descripcion": "Pasillo B3"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+# Los scripts de shell deben tener finales de línea LF aunque se editen en Windows,
+# si no, en Mac/Linux fallan con "bad interpreter: ...^M".
+*.sh text eol=lf
