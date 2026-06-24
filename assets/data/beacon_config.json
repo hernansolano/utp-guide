@@ -1,5 +1,5 @@
 {
-  "_descripcion": "Configuración de balizas BLE y parámetros de calibración. FISC piso 4. Editar en campo no requiere recompilar.",
+  "_descripcion": "PARCIAL piso 4 (ala derecha). Balizas propuestas en zigzag.",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 4,
   "calibracion": {
@@ -10,10 +10,47 @@
     "expiracion_lectura_segundos": 3
   },
   "beacons": [
-    {"minor": 1, "x": 10.29,  "y": 28.673, "txPower_dbm": -65, "descripcion": "Fondo pasillo vertical (sur)"},
-    {"minor": 2, "x": 0.294,  "y": 2.801,  "txPower_dbm": -65, "descripcion": "Esquina noroeste"},
-    {"minor": 3, "x": 22.772, "y": 2.871,  "txPower_dbm": -65, "descripcion": "Esquina noreste"},
-    {"minor": 4, "x": 10.081, "y": 5.823,  "txPower_dbm": -65, "descripcion": "Junción pasillo / vertical"},
-    {"minor": 5, "x": 6.547,  "y": 15.911, "txPower_dbm": -65, "descripcion": "Pasillo vertical (baños)"}
+    {
+      "minor": 1,
+      "x": 75,
+      "y": 4.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 1"
+    },
+    {
+      "minor": 2,
+      "x": 90,
+      "y": 4.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 2"
+    },
+    {
+      "minor": 3,
+      "x": 104,
+      "y": 4.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 3"
+    },
+    {
+      "minor": 4,
+      "x": 78,
+      "y": 9.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 4"
+    },
+    {
+      "minor": 5,
+      "x": 93,
+      "y": 9.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 5"
+    },
+    {
+      "minor": 6,
+      "x": 102,
+      "y": 9.0,
+      "txPower_dbm": -65,
+      "descripcion": "Ala este 6"
+    }
   ]
 }
