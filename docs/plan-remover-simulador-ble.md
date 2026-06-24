@@ -1,7 +1,13 @@
 # Plan — Quitar el beacon simulado (`SimulatedBleService`) de la app
 
-Estado: **pendiente** (acordado para hacerlo más adelante). El simulador ya no aporta
-valor (las pruebas se hacen con balizas/emisores reales). Supera el ADR-0008.
+Estado: **soft-delete aplicado** (2026-06-24). El simulador quedó **desconectado** vía
+`kSimuladorHabilitado=false` en `app_config.dart` (mismo patrón que el AR con `kArHabilitado`):
+la fuente BLE es directamente la real, el simulador no se construye ni corre, y el toggle
+"Modo simulación" no aparece en Ajustes. **El código sigue en su sitio** (reactivable poniendo
+el flag en `true`). `flutter analyze` limpio.
+
+Lo de abajo es la **remoción completa opcional** (borrar archivos), por si en el futuro se
+decide eliminarlo del todo. No es necesaria para el soft-delete.
 
 ## Se borran (100% simulador)
 - `lib/services/simulated_ble_service.dart`

@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'app_config.dart';
 import 'data/repositories/beacon_repository.dart';
 import 'data/repositories/grafo_repository.dart';
 import 'models/beacon_config.dart';
@@ -86,15 +87,18 @@ final calibracionNotifier =
 final BleSource _bleServiceReal = Platform.isIOS
     ? IbeaconCoreLocationService()
     : BleService();
-final _bleServiceSimulado = SimulatedBleService(
-  _beaconRepository,
-  posicionVirtualNotifier,
-);
-final _bleSource = BleSourceMultiplexer(
-  _bleServiceReal,
-  _bleServiceSimulado,
-  modoSimulacionNotifier,
-);
+
+/// Beacon simulado desactivado (soft-delete, ver `app_config.dart`). Con el
+/// flag en `false`, la fuente es directamente la real: el simulador no se
+/// construye ni corre. Poner `kSimuladorHabilitado=true` reconecta el
+/// multiplexer real/simulado sin más cambios.
+final BleSource _bleSource = kSimuladorHabilitado
+    ? BleSourceMultiplexer(
+        _bleServiceReal,
+        SimulatedBleService(_beaconRepository, posicionVirtualNotifier),
+        modoSimulacionNotifier,
+      )
+    : _bleServiceReal;
 
 final _routingService     = RoutingService(_grafoRepository);
 final _positioningService = PositioningService(
@@ -226,8 +230,8 @@ Future<void> main() async {
   try {
     calibracionNotifier.value = await _beaconRepository.obtenerCalibracion();
     final uuid = await _beaconRepository.obtenerUuid();
-    // El multiplexer propaga al real (BleService o IbeaconCoreLocation)
-    // y al simulado (no-op). No requiere cast por plataforma.
+    // Propaga el UUID a la fuente real (o al multiplexer, si el simulador
+    // estuviera habilitado). No requiere cast por plataforma.
     _bleSource.configurarUuidObjetivo(uuid);
   } catch (_) {
     // Defaults ya están seteados — log opcional aquí en el futuro.

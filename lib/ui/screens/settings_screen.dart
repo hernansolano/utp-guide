@@ -143,17 +143,20 @@ class SettingsScreen extends StatelessWidget {
                     _SettingsGroup(
                       label: 'Desarrollador',
                       children: [
-                        _SettingsRow(
-                          icon: Icons.science_outlined,
-                          title: 'Modo simulación',
-                          sub:
-                              'Genera lecturas BLE sintéticas desde el dedo sobre el mapa, '
-                              'sin necesidad de balizas reales.',
-                          toggle: true,
-                          value: modoSimulacionNotifier.value,
-                          onToggle: () => modoSimulacionNotifier.value =
-                              !modoSimulacionNotifier.value,
-                        ),
+                        // Simulador desactivado (ver app_config.dart). El toggle
+                        // se oculta; el código se conserva para reactivarlo.
+                        if (kSimuladorHabilitado)
+                          _SettingsRow(
+                            icon: Icons.science_outlined,
+                            title: 'Modo simulación',
+                            sub:
+                                'Genera lecturas BLE sintéticas desde el dedo sobre el mapa, '
+                                'sin necesidad de balizas reales.',
+                            toggle: true,
+                            value: modoSimulacionNotifier.value,
+                            onToggle: () => modoSimulacionNotifier.value =
+                                !modoSimulacionNotifier.value,
+                          ),
                         _SettingsRow(
                           icon: Icons.alt_route_rounded,
                           title: 'Snap-to-graph',
