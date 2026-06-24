@@ -1,10 +1,10 @@
 {
-  "_descripcion": "EXP2 pasillo, 4 balizas en rectángulo compacto central (~9 m).",
+  "_descripcion": "EXP2 pasillo, 4 balizas en rectángulo compacto central (~9 m). Calib EXP1.",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 4,
   "calibracion": {
-    "txPower_dbm_default": -65,
-    "n_exponente_perdida": 3.5,
+    "txPower_dbm_default": -59,
+    "n_exponente_perdida": 1.6,
     "ventana_media_movil": 8,
     "tolerancia_snap_metros": 3.0,
     "expiracion_lectura_segundos": 3
@@ -14,28 +14,28 @@
       "minor": 1,
       "x": 7.0,
       "y": 0.3,
-      "txPower_dbm": -65,
+      "txPower_dbm": -59,
       "descripcion": "Pasillo B1"
     },
     {
       "minor": 2,
       "x": 16.0,
       "y": 0.3,
-      "txPower_dbm": -65,
+      "txPower_dbm": -59,
       "descripcion": "Pasillo B2"
     },
     {
       "minor": 3,
       "x": 7.0,
       "y": 5.6,
-      "txPower_dbm": -65,
+      "txPower_dbm": -59,
       "descripcion": "Pasillo B3"
     },
     {
       "minor": 4,
       "x": 16.0,
       "y": 5.6,
-      "txPower_dbm": -65,
+      "txPower_dbm": -59,
       "descripcion": "Pasillo B4"
     }
   ]

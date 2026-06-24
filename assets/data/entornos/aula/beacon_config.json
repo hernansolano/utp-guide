@@ -1,5 +1,5 @@
 {
-  "_descripcion": "Aula 8x7, 4 balizas en esquinas (geometría ideal). major 99.",
+  "_descripcion": "Aula 8x7, 4 balizas en esquinas (geometría ideal). major 99. Calibración default: pendiente EXP1 propio del aula.",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 99,
   "calibracion": {
