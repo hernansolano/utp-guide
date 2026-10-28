@@ -34,6 +34,7 @@ Los ADRs son **inmutables**. Si una decisión se revierte o evoluciona, se crea 
 | [0010](0010-map-view-widget.md) | MapView: widget de mapa con cámara controlable y fix de coordenadas | aceptado | 2026-05-21 |
 | [0011](0011-calibracion-en-campo.md) | Pantalla de calibración en campo con ajustes en vivo | aceptado | 2026-05-27 |
 | [0012](0012-pipeline-importacion-mapas.md) | Pipeline de importación de mapas (DXF → SVG + grafo) | aceptado | 2026-06-22 |
+| [0013](0013-plano-oficial-recintos.md) | Mapa desde el plano oficial (PDF 1:250) + recintos interactivos | aceptado | 2026-10-27 |
 
 ## Cómo crear un nuevo ADR
 

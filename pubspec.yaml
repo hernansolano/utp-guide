@@ -47,6 +47,9 @@ flutter:
   assets:
     - assets/data/grafo.json
     - assets/data/beacon_config.json
+    # Planos de recintos (polígonos de salones/oficinas). Cada grafo los
+    # referencia por su campo `recintos_json`.
+    - assets/data/recintos/
     - assets/maps/
     # - assets/models/   # vacía (era para modelos de AR, desactivada).
     #   Una carpeta de assets vacía declarada aquí puede romper el bundle.

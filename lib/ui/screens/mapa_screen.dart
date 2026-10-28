@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import '../../data/repositories/grafo_repository.dart';
+import '../../data/repositories/recinto_repository.dart';
+import '../../models/recinto.dart';
 import '../../models/nodo.dart';
 import '../../models/paso_navegacion.dart';
 import '../../models/perfil_movilidad.dart';
@@ -36,6 +38,7 @@ class MapaScreen extends StatefulWidget {
   final RoutingService routingService;
   final PositioningService positioningService;
   final GrafoRepository grafoRepository;
+  final RecintoRepository recintoRepository;
   final TtsService ttsService;
   final TrazaService trazaService;
   final ValueNotifier<bool> arAutomaticoNotifier;
@@ -50,6 +53,7 @@ class MapaScreen extends StatefulWidget {
     required this.routingService,
     required this.positioningService,
     required this.grafoRepository,
+    required this.recintoRepository,
     required this.ttsService,
     required this.trazaService,
     required this.arAutomaticoNotifier,
@@ -80,6 +84,9 @@ class _MapaScreenState extends State<MapaScreen> {
   /// que termine la carga inicial.
   String? _svgPath;
 
+  /// Recintos del piso; el del destino se resalta en el mapa.
+  PlanoRecintos _plano = PlanoRecintos.vacio;
+
   // Posición BLE del usuario expuesta como notifier — así el rebuild
   // por cada lectura se aísla al MapView y al chip BLE, en lugar de
   // hacer setState global del Stack entero (6+ widgets de overlay).
@@ -90,6 +97,9 @@ class _MapaScreenState extends State<MapaScreen> {
 
   BleEstado _bleEstado = BleEstado.inactivo;
   bool _dialogoBlePendiente = false;
+
+  /// Piso del grafo activo (para la posición virtual del modo simulación).
+  int _piso = 1;
 
   /// Token que se incrementa con cada recálculo de ruta. Al recibir
   /// el resultado, comparamos contra el token actual: si no coincide,
@@ -142,10 +152,14 @@ class _MapaScreenState extends State<MapaScreen> {
     try {
       final dims = await widget.grafoRepository.obtenerDimensionesMapa();
       final svgPath = await widget.grafoRepository.obtenerMapaSvgPath();
+      final plano = await widget.recintoRepository.obtenerPlano();
+      final piso = await widget.grafoRepository.obtenerPiso();
       if (!mounted) return;
       setState(() {
+        _piso = piso;
         _mapaSize = Size(dims.anchoMetros, dims.altoMetros);
         _svgPath = svgPath;
+        _plano = plano;
       });
 
       // Primera ruta: desde la entrada (aún no hay posición BLE). Cuando
@@ -332,8 +346,9 @@ class _MapaScreenState extends State<MapaScreen> {
     _origenActualId = nodo.id;
     try {
       await _recalcularRuta(perfil: _perfilActual);
-    } catch (_) {
+    } catch (e) {
       // Grafo conexo: no debería fallar. Si pasa, conservamos la ruta.
+      debugPrint('[MapaScreen] re-ruteo desde ${nodo.id} falló: $e');
     }
   }
 
@@ -485,7 +500,7 @@ class _MapaScreenState extends State<MapaScreen> {
     widget.posicionVirtualNotifier.value = Position(
       x: metros.dx,
       y: metros.dy,
-      piso: 1,
+      piso: _piso,
       timestamp: DateTime.now(),
     );
   }
@@ -619,6 +634,10 @@ class _MapaScreenState extends State<MapaScreen> {
                                       ? _onTapPosicionVirtual
                                       : null,
                                   controller: _mapController,
+                                  plano: _plano,
+                                  recintoResaltadoId: _plano
+                                      .recintoDeNodo(widget.destinoId)
+                                      ?.id,
                                 ),
                               );
                             },

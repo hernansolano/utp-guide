@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "piso": 4,
+  "edificio": "FISC",
+  "origen_descripcion": "Esquina superior izquierda del plano oficial (margen de 1 m), en metros",
+  "mapa_svg": "assets/maps/fisc_piso4_oficial.svg",
+  "recintos_json": "assets/data/recintos/fisc_piso4_oficial.json",
+  "mapa_ancho_metros": 127.24,
+  "mapa_alto_metros": 78.52,
+  "_nota": "Plano oficial UTP (CVLS Edificio #3 Tercer Alto, 2025) a escala real. Grafo MÍNIMO: solo la llegada al piso; faltan los pasillos y las puertas de los recintos.",
+  "nodos": [
+    {
+      "id": "vestibulo_principal",
+      "nombre": "Vestíbulo principal (ascensor y escalera N.º 1)",
+      "tipo": "ENTRADA",
+      "x": 67.17,
+      "y": 68.03,
+      "piso": 4,
+      "accesible": true
+    }
+  ],
+  "aristas": []
+}

@@ -1,9 +1,11 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'app_config.dart';
 import 'data/repositories/beacon_repository.dart';
 import 'data/repositories/grafo_repository.dart';
+import 'data/repositories/recinto_repository.dart';
 import 'models/beacon_config.dart';
 import 'models/perfil_movilidad.dart';
 import 'models/position.dart';
@@ -33,6 +35,7 @@ import 'research/services/research_exporter.dart';
 // ─── Repositorios (singleton por app) ─────────────────────────────────────────
 final _grafoRepository  = GrafoRepository();
 final _beaconRepository = BeaconRepository();
+final _recintoRepository = RecintoRepository(_grafoRepository);
 
 // ─── Modo Investigador (JIC) ──────────────────────────────────────────────
 final _measurementRepository = MeasurementRepository();
@@ -84,7 +87,10 @@ final calibracionNotifier =
 /// - **Android** → [BleService] (flutter_blue_plus). Detecta iBeacons
 ///   sin problemas y nos da el stream crudo de advertisements para el
 ///   diagnóstico de la pantalla de calibración.
-final BleSource _bleServiceReal = Platform.isIOS
+///
+/// En web (demo del mapa sin BLE) se usa [BleService], que queda en
+/// `permisosNegados`: `Platform` de dart:io no existe en el navegador.
+final BleSource _bleServiceReal = !kIsWeb && Platform.isIOS
     ? IbeaconCoreLocationService()
     : BleService();
 
@@ -142,6 +148,7 @@ final _router = GoRouter(
           routingService: _routingService,
           positioningService: _positioningService,
           grafoRepository: _grafoRepository,
+          recintoRepository: _recintoRepository,
           ttsService: _ttsService,
           trazaService: _trazaService,
           arAutomaticoNotifier: arAutomaticoNotifier,
@@ -155,6 +162,7 @@ final _router = GoRouter(
       path: '/explorar',
       builder: (_, _) => ExplorarScreen(
         grafoRepository: _grafoRepository,
+        recintoRepository: _recintoRepository,
         positioningService: _positioningService,
         trazaService: _trazaService,
         accesibleSoloRutasNotifier: accesibleSoloRutasNotifier,
@@ -233,8 +241,12 @@ Future<void> main() async {
     // Propaga el UUID a la fuente real (o al multiplexer, si el simulador
     // estuviera habilitado). No requiere cast por plataforma.
     _bleSource.configurarUuidObjetivo(uuid);
-  } catch (_) {
-    // Defaults ya están seteados — log opcional aquí en el futuro.
+  } catch (e) {
+    // La app arranca igual con los defaults de calibración y el UUID
+    // histórico, pero hay que dejar rastro: si no, un JSON roto pasa
+    // desapercibido y el posicionamiento usa valores equivocados.
+    debugPrint('[main] beacon_config.json no se pudo cargar, se usan los '
+        'valores por defecto: $e');
   }
   runApp(const UtpGuideApp());
 }

@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/grafo_repository.dart';
+import '../../data/repositories/recinto_repository.dart';
 import '../../models/nodo.dart';
 import '../../models/perfil_movilidad.dart';
 import '../../models/position.dart';
+import '../../models/recinto.dart';
 import '../../models/tipo_nodo.dart';
 import '../../services/ble_service.dart' show BleEstado;
 import '../../services/positioning_service.dart';
@@ -25,11 +27,15 @@ import '../widgets/mapa_painter.dart';
 ///   coloreados sobre el SVG.
 /// - Tocar cerca de un POI para que se resalte y aparezca un panel con
 ///   su info + botón "Ir aquí" que navega a `/mapa` con ese destino.
+/// - Si el piso tiene plano de recintos, tocar dentro de un salón, oficina
+///   o baño lo resalta y muestra su ficha; "Ir aquí" aparece cuando el
+///   recinto está enlazado a un nodo del grafo.
 ///
 /// El BottomNav `Mapa` apunta a esta pantalla (antes apuntaba a
 /// `/search`, lo cual no permitía exploración visual).
 class ExplorarScreen extends StatefulWidget {
   final GrafoRepository grafoRepository;
+  final RecintoRepository recintoRepository;
   final PositioningService positioningService;
   final TrazaService trazaService;
   final ValueNotifier<bool> accesibleSoloRutasNotifier;
@@ -39,6 +45,7 @@ class ExplorarScreen extends StatefulWidget {
   const ExplorarScreen({
     super.key,
     required this.grafoRepository,
+    required this.recintoRepository,
     required this.positioningService,
     required this.trazaService,
     required this.accesibleSoloRutasNotifier,
@@ -66,10 +73,12 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
   Size? _mapaSize;
   String? _svgPath;
   List<Nodo> _pois = const [];
+  PlanoRecintos _plano = PlanoRecintos.vacio;
   String? _error;
   bool _cargando = true;
 
   Nodo? _poiSeleccionado;
+  Recinto? _recintoSeleccionado;
   BleEstado _bleEstado = BleEstado.inactivo;
   bool _avisoBlePendiente = false;
 
@@ -102,11 +111,13 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
       final svg = await widget.grafoRepository.obtenerMapaSvgPath();
       final nodos = await widget.grafoRepository.obtenerNodos();
       final pois = nodos.where((n) => !_tiposOcultos.contains(n.tipo)).toList();
+      final plano = await widget.recintoRepository.obtenerPlano();
       if (!mounted) return;
       setState(() {
         _mapaSize = Size(dims.anchoMetros, dims.altoMetros);
         _svgPath = svg;
         _pois = pois;
+        _plano = plano;
         _cargando = false;
       });
     } catch (e) {
@@ -154,7 +165,8 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
 
   /// El usuario tocó el mapa en estas coords (metros). Buscamos el POI
   /// más cercano dentro de la tolerancia; si hay match, lo seleccionamos
-  /// y aparece el bottom sheet con su info. Si no, limpiamos selección.
+  /// y aparece el bottom sheet con su info. Si no hay POI cerca, probamos
+  /// con el recinto que contiene el punto. Si nada, limpiamos selección.
   void _onTapMapa(Offset metros) {
     Nodo? mejor;
     double mejorDist = double.infinity;
@@ -167,10 +179,22 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
         mejor = poi;
       }
     }
+    final poi =
+        (mejor != null && mejorDist <= _toleranciaTapMetros) ? mejor : null;
     setState(() {
-      _poiSeleccionado =
-          (mejor != null && mejorDist <= _toleranciaTapMetros) ? mejor : null;
+      _poiSeleccionado = poi;
+      _recintoSeleccionado = poi == null ? _plano.recintoEn(metros) : null;
     });
+  }
+
+  /// Nodo del grafo al que lleva el recinto, si el grafo lo enlaza.
+  Nodo? _nodoDeRecinto(Recinto r) {
+    final id = r.nodoId;
+    if (id == null) return null;
+    for (final n in _pois) {
+      if (n.id == id) return n;
+    }
+    return null;
   }
 
   void _irHaciaPoi(Nodo poi) {
@@ -310,6 +334,11 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
 
     final mapaSize = _mapaSize!;
     final poiSel = _poiSeleccionado;
+    final recintoSel = _recintoSeleccionado;
+    final hayFicha = poiSel != null || recintoSel != null;
+    // Recinto a resaltar: el tocado, o el que corresponde al POI tocado.
+    final recintoResaltado =
+        recintoSel ?? (poiSel != null ? _plano.recintoDeNodo(poiSel.id) : null);
 
     return Scaffold(
       backgroundColor: colors.bgMuted,
@@ -335,6 +364,8 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                           panZoomHabilitado: true,
                           onTapMundo: _onTapMapa,
                           controller: _mapController,
+                          plano: _plano,
+                          recintoResaltadoId: recintoResaltado?.id,
                         ),
                       );
                     },
@@ -374,7 +405,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                 // Chip BLE inferior-izquierda.
                 Positioned(
                   left: 16,
-                  bottom: poiSel != null ? 200 : 16,
+                  bottom: hayFicha ? 200 : 16,
                   child: ListenableBuilder(
                     listenable: Listenable.merge(
                         [_posicionUsuarioNotifier, _beaconsActivosNotifier]),
@@ -389,6 +420,15 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                     right: 16,
                     bottom: 16,
                     child: _buildPoiCard(context, colors, poiSel),
+                  ),
+
+                // Ficha del recinto tocado (plano oficial).
+                if (recintoSel != null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: _buildRecintoCard(context, colors, recintoSel),
                   ),
               ],
             ),
@@ -608,8 +648,58 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
 
   Widget _buildPoiCard(BuildContext context, AppColors colors, Nodo poi) {
     final dist = _distanciaDesdeUsuario(poi);
-    final colorTipo = MapaPainter.colorParaTipo(poi.tipo);
+    return _buildFicha(
+      colors,
+      titulo: poi.nombre,
+      subtitulo: _etiquetaTipo(poi.tipo) +
+          (dist != null ? ' · ${dist.toStringAsFixed(1)} m de ti' : ''),
+      color: MapaPainter.colorParaTipo(poi.tipo),
+      icono: _iconoParaTipo(poi.tipo),
+      onCerrar: () => setState(() => _poiSeleccionado = null),
+      onIr: () => _irHaciaPoi(poi),
+    );
+  }
 
+  /// Ficha de un recinto del plano oficial. "Ir aquí" solo aparece si el
+  /// grafo enlaza el recinto a un nodo; si no, se explica por qué.
+  Widget _buildRecintoCard(BuildContext context, AppColors colors, Recinto r) {
+    final tipoNodo = r.tipo.tipoNodo;
+    final nodo = _nodoDeRecinto(r);
+    final partes = <String>[
+      if (r.codigo != null && !r.nombre.contains(r.codigo!)) r.codigo!,
+      _etiquetaTipoRecinto(r.tipo),
+      if (r.areaM2 != null) '${r.areaM2!.toStringAsFixed(0)} m²',
+    ];
+    final String? aviso = !r.tipo.esPublico
+        ? 'Área técnica, sin acceso al público'
+        : nodo == null
+            ? 'Todavía no hay ruta hasta aquí'
+            : null;
+    return _buildFicha(
+      colors,
+      titulo: r.nombre,
+      subtitulo: partes.join(' · '),
+      color: tipoNodo != null ? MapaPainter.colorParaTipo(tipoNodo) : colors.fgSoft,
+      icono: tipoNodo != null ? _iconoParaTipo(tipoNodo) : Icons.lock_outline_rounded,
+      onCerrar: () => setState(() => _recintoSeleccionado = null),
+      onIr: nodo != null ? () => _irHaciaPoi(nodo) : null,
+      aviso: aviso,
+    );
+  }
+
+  /// Tarjeta inferior común a POIs y recintos: ícono, título, subtítulo y
+  /// botón "Ir aquí" (o un aviso cuando no se puede navegar).
+  Widget _buildFicha(
+    AppColors colors, {
+    required String titulo,
+    required String subtitulo,
+    required Color color,
+    required IconData icono,
+    required VoidCallback onCerrar,
+    VoidCallback? onIr,
+    String? aviso,
+  }) {
+    final colorTipo = color;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -639,8 +729,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                   border: Border.all(color: colorTipo, width: 1.2),
                 ),
                 alignment: Alignment.center,
-                child: Icon(_iconoParaTipo(poi.tipo),
-                    color: colorTipo, size: 18),
+                child: Icon(icono, color: colorTipo, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -648,7 +737,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      poi.nombre,
+                      titulo,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -658,10 +747,7 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      _etiquetaTipo(poi.tipo) +
-                          (dist != null
-                              ? ' · ${dist.toStringAsFixed(1)} m de ti'
-                              : ''),
+                      subtitulo,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -672,36 +758,56 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
                 ),
               ),
               IconButton(
-                onPressed: () =>
-                    setState(() => _poiSeleccionado = null),
+                onPressed: onCerrar,
                 icon: Icon(Icons.close_rounded, color: colors.fgSoft),
                 tooltip: 'Cerrar',
               ),
             ],
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => _irHaciaPoi(poi),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.brand,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          if (aviso != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: 2),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: colors.fgSoft),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      aviso,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: colors.fgMuted,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              icon: const Icon(Icons.navigation_rounded, size: 18),
-              label: Text(
-                'Ir aquí',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+            ),
+          if (onIr != null)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onIr,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.brand,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.navigation_rounded, size: 18),
+                label: Text(
+                  'Ir aquí',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -728,6 +834,25 @@ class _ExplorarScreenState extends State<ExplorarScreen> {
       case TipoNodo.interseccion:
       case TipoNodo.marcadorAr:
         return Icons.place_outlined;
+    }
+  }
+
+  static String _etiquetaTipoRecinto(TipoRecinto tipo) {
+    switch (tipo) {
+      case TipoRecinto.salon:
+        return 'Salón';
+      case TipoRecinto.oficina:
+        return 'Oficina';
+      case TipoRecinto.bano:
+        return 'Baño';
+      case TipoRecinto.escalera:
+        return 'Escalera';
+      case TipoRecinto.ascensor:
+        return 'Ascensor';
+      case TipoRecinto.servicio:
+        return 'Cuarto técnico';
+      case TipoRecinto.balcon:
+        return 'Balcón';
     }
   }
 

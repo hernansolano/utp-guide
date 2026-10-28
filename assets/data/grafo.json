@@ -2,102 +2,22 @@
   "version": "1.0",
   "piso": 4,
   "edificio": "FISC",
-  "origen_descripcion": "Esquina superior izquierda (NO), en metros",
-  "mapa_svg": "assets/maps/fisc_piso4_pasillo_3b_esq.svg",
-  "mapa_ancho_metros": 23.19,
-  "mapa_alto_metros": 5.72,
-  "_nota": "3 balizas, triángulo ANCHO: norte en esquinas + sur centro.",
+  "origen_descripcion": "Esquina superior izquierda del plano oficial (margen de 1 m), en metros",
+  "mapa_svg": "assets/maps/fisc_piso4_oficial.svg",
+  "recintos_json": "assets/data/recintos/fisc_piso4_oficial.json",
+  "mapa_ancho_metros": 127.24,
+  "mapa_alto_metros": 78.52,
+  "_nota": "Plano oficial UTP (CVLS Edificio #3 Tercer Alto, 2025) a escala real. Grafo MÍNIMO: solo la llegada al piso; faltan los pasillos y las puertas de los recintos.",
   "nodos": [
     {
-      "id": "entrada_oeste",
-      "nombre": "Entrada oeste",
+      "id": "vestibulo_principal",
+      "nombre": "Vestíbulo principal (ascensor y escalera N.º 1)",
       "tipo": "ENTRADA",
-      "x": 0.5,
-      "y": 2.86,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p1",
-      "nombre": "Pasillo p1",
-      "tipo": "INTERSECCION",
-      "x": 4.0,
-      "y": 2.86,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p2",
-      "nombre": "Pasillo p2",
-      "tipo": "INTERSECCION",
-      "x": 8.0,
-      "y": 2.86,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p3",
-      "nombre": "Pasillo p3",
-      "tipo": "INTERSECCION",
-      "x": 11.6,
-      "y": 2.86,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p4",
-      "nombre": "Pasillo p4",
-      "tipo": "INTERSECCION",
-      "x": 16.0,
-      "y": 2.86,
-      "piso": 4,
-      "accesible": true
-    },
-    {
-      "id": "p5",
-      "nombre": "Pasillo p5",
-      "tipo": "INTERSECCION",
-      "x": 20.0,
-      "y": 2.86,
+      "x": 67.17,
+      "y": 68.03,
       "piso": 4,
       "accesible": true
     }
   ],
-  "aristas": [
-    {
-      "origenId": "entrada_oeste",
-      "destinoId": "p1",
-      "distancia": 3.5,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p1",
-      "destinoId": "p2",
-      "distancia": 4.0,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p2",
-      "destinoId": "p3",
-      "distancia": 3.6,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p3",
-      "destinoId": "p4",
-      "distancia": 4.4,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    },
-    {
-      "origenId": "p4",
-      "destinoId": "p5",
-      "distancia": 4.0,
-      "tipoObstaculo": "NINGUNO",
-      "accesible": true
-    }
-  ]
+  "aristas": []
 }

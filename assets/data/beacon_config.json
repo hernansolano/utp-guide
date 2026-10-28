@@ -1,5 +1,5 @@
 {
-  "_descripcion": "3 balizas, triángulo ANCHO: norte en esquinas + sur centro.",
+  "_descripcion": "Piso 4 con el plano oficial. Sin balizas ubicadas todavía: el punto azul no aparece hasta registrar las balizas reales en este sistema de coordenadas. Calibración = la medida en el pasillo (EXP1).",
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "major": 4,
   "calibracion": {
@@ -9,27 +9,5 @@
     "tolerancia_snap_metros": 3.0,
     "expiracion_lectura_segundos": 3
   },
-  "beacons": [
-    {
-      "minor": 1,
-      "x": 0.4,
-      "y": 0.3,
-      "txPower_dbm": -59,
-      "descripcion": "Pasillo B1"
-    },
-    {
-      "minor": 2,
-      "x": 22.8,
-      "y": 0.3,
-      "txPower_dbm": -59,
-      "descripcion": "Pasillo B2"
-    },
-    {
-      "minor": 3,
-      "x": 11.6,
-      "y": 5.4,
-      "txPower_dbm": -59,
-      "descripcion": "Pasillo B3"
-    }
-  ]
+  "beacons": []
 }

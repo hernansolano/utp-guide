@@ -52,3 +52,7 @@ samples/
 # Documentos de referencia de la JIC (lineamientos, instructivo, plan) —
 # material local, incluye binarios y bloqueos de Word. No se versiona.
 jic-files/
+
+# Plano oficial de la UTP (PDF fuente, 1:250). Se usa localmente con
+# tools/plano_oficial/extraer_plano.py; no se versiona (ADR-0013).
+/05 - CVLS - *.pdf

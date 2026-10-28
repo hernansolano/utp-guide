@@ -12,6 +12,13 @@ class GrafoParseException implements Exception {
   String toString() => 'GrafoParseException: $message';
 }
 
+class RecintosInvalidosException implements Exception {
+  final String message;
+  const RecintosInvalidosException(this.message);
+  @override
+  String toString() => 'RecintosInvalidosException: $message';
+}
+
 class NodeNotFoundException implements Exception {
   final String id;
   const NodeNotFoundException(this.id);

@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../models/nodo.dart';
 import '../../models/position.dart';
+import '../../models/recinto.dart';
 import '../theme/app_theme.dart';
 import 'mapa_painter.dart';
+import 'recintos_painter.dart';
 
 /// Widget reutilizable de mapa con comportamiento estilo Google Maps:
 /// pan, zoom, recentrar en el usuario, seguir al usuario, encuadrar
@@ -69,6 +71,14 @@ class MapView extends StatefulWidget {
   /// imperativamente desde la pantalla padre.
   final MapViewController? controller;
 
+  /// Recintos del piso (polígonos de salones, oficinas, baños y pasillos).
+  /// Si el plano no está vacío, la app pinta los rellenos debajo del SVG y
+  /// las etiquetas encima; el SVG solo aporta muros y detalle.
+  final PlanoRecintos plano;
+
+  /// Id del recinto a resaltar (seleccionado o destino de la ruta).
+  final String? recintoResaltadoId;
+
   const MapView({
     super.key,
     required this.mapaSize,
@@ -84,6 +94,8 @@ class MapView extends StatefulWidget {
     this.pois = const [],
     this.poiResaltadoId,
     this.traza = const [],
+    this.plano = PlanoRecintos.vacio,
+    this.recintoResaltadoId,
   });
 
   @override
@@ -112,10 +124,19 @@ class _MapViewState extends State<MapView>
   /// de debug) lo forzaba. Esto lo vuelve determinístico.
   bool _encuadreInicialHecho = false;
 
+  /// Zoom actual, publicado aparte para que la capa de etiquetas se repinte
+  /// durante el pinch sin reconstruir el árbol.
+  final ValueNotifier<double> _zoom = ValueNotifier<double>(1.0);
+
+  /// Textos maquetados de las etiquetas de recintos (ver
+  /// [EtiquetasRecintosCache]); sobrevive a los rebuilds por cada lectura BLE.
+  final EtiquetasRecintosCache _etiquetasCache = EtiquetasRecintosCache();
+
   @override
   void initState() {
     super.initState();
-    _viewerController = TransformationController();
+    _viewerController = TransformationController()
+      ..addListener(() => _zoom.value = _zoomActual);
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -128,6 +149,8 @@ class _MapViewState extends State<MapView>
     widget.controller?._unbind(this);
     _viewerController.dispose();
     _animController.dispose();
+    _zoom.dispose();
+    _etiquetasCache.limpiar();
     super.dispose();
   }
 
@@ -263,7 +286,7 @@ class _MapViewState extends State<MapView>
     );
 
     final escala = (zoomDeseado ?? _zoomActual)
-        .clamp(widget.minZoom, widget.maxZoom);
+        .clamp(widget.minZoom, _maxZoomEfectivo);
 
     // Matrix = translate(viewportCenter) * scale * translate(-puntoEscena):
     // el punto de la escena queda exactamente en el centro del viewport.
@@ -275,6 +298,14 @@ class _MapViewState extends State<MapView>
 
     _animarMatrix(matrix, animado: animado);
   }
+
+  /// Zoom máximo real: el de [MapView.maxZoom], o más si el plano es tan
+  /// grande que con ese zoom un salón no se alcanza a leer (el piso completo
+  /// mide ~127 m: a 6x quedaría en ~18 px por metro en un teléfono). Se
+  /// garantizan al menos [_pxPorMetroMinimo] px por metro. Lo fija [build].
+  double _maxZoomEfectivo = 6.0;
+
+  static const double _pxPorMetroMinimo = 30;
 
   /// Zoom actual leído del Matrix4 del InteractiveViewer.
   ///
@@ -387,13 +418,21 @@ class _MapViewState extends State<MapView>
         // letterboxing que el painter no compensaba, y los dots
         // aparecían fuera del SVG visible.
         final mapaAspect = widget.mapaSize.width / widget.mapaSize.height;
+        // Ancho del rectángulo del mapa (AspectRatio centrado en el viewport)
+        // para fijar el zoom máximo antes de que el LayoutBuilder interno mida.
+        final anchoBox =
+            min(nuevoViewport.width, nuevoViewport.height * mapaAspect);
+        final maxScale = _maxZoomEfectivo = anchoBox > 0
+            ? max(widget.maxZoom,
+                _pxPorMetroMinimo / (anchoBox / widget.mapaSize.width))
+            : widget.maxZoom;
 
         return InteractiveViewer(
           transformationController: _viewerController,
           panEnabled: widget.panZoomHabilitado,
           scaleEnabled: widget.panZoomHabilitado,
           minScale: widget.minZoom,
-          maxScale: widget.maxZoom,
+          maxScale: maxScale,
           boundaryMargin: const EdgeInsets.all(80),
           onInteractionStart: (_) => _onInicioGestoUsuario(),
           child: Center(
@@ -422,11 +461,46 @@ class _MapViewState extends State<MapView>
   /// los bordes del piso. Además, `localPosition` del gesto ya viene en
   /// coords del box, lo que simplifica la conversión a metros.
   Widget _buildMapaInterno(Size box) {
+    final conRecintos = !widget.plano.estaVacio;
+    final coloresRecintos = conRecintos ? ColoresRecintos.of(context) : null;
     Widget contenido = Stack(
       fit: StackFit.expand,
       children: [
+        // Orden de capas: rellenos de recintos → muros (SVG) → etiquetas →
+        // ruta y punto azul. Así los muros quedan encima de los rellenos y
+        // las etiquetas nunca quedan tapadas por un muro.
+        if (conRecintos)
+          CustomPaint(
+            painter: RecintosFondoPainter(
+              plano: widget.plano,
+              mapaSize: widget.mapaSize,
+              colores: coloresRecintos!,
+              resaltadoId: widget.recintoResaltadoId,
+            ),
+            size: box,
+          ),
         if (widget.svgAsset != null)
-          SvgPicture.asset(widget.svgAsset!, fit: BoxFit.fill),
+          SvgPicture.asset(
+            widget.svgAsset!,
+            fit: BoxFit.fill,
+            // Los SVG generados del plano oficial dibujan en `currentColor`
+            // para seguir el tema (claro/oscuro); los demás SVG traen colores
+            // fijos y lo ignoran.
+            theme: SvgTheme(
+                currentColor: coloresRecintos?.muros ?? context.colors.fgMuted),
+          ),
+        if (conRecintos)
+          CustomPaint(
+            painter: RecintosEtiquetasPainter(
+              plano: widget.plano,
+              mapaSize: widget.mapaSize,
+              colores: coloresRecintos!,
+              zoom: _zoom,
+              cache: _etiquetasCache,
+              resaltadoId: widget.recintoResaltadoId,
+            ),
+            size: box,
+          ),
         CustomPaint(
           painter: MapaPainter.fromContext(
             context,

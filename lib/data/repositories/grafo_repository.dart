@@ -29,15 +29,21 @@ class DimensionesMapa {
 ///
 /// La validación ([_validar]) se ejecuta al cargar el archivo y rechaza
 /// grafos con IDs duplicados, aristas a nodos inexistentes, distancias
-/// no positivas, o sin nodo `ENTRADA`. Lanza [GrafoInvalidoException]
+/// no positivas, sin `mapa_svg` o sin nodo `ENTRADA`. Lanza [GrafoInvalidoException]
 /// con un mensaje descriptivo.
 class GrafoRepository {
+  /// De dónde se lee `grafo.json`. En la app es [rootBundle]; los tests
+  /// inyectan un bundle con un grafo de prueba.
+  final AssetBundle _bundle;
+
+  GrafoRepository({AssetBundle? bundle}) : _bundle = bundle ?? rootBundle;
+
   Map<String, dynamic>? _cachedData;
 
   Future<Map<String, dynamic>> _load() async {
     if (_cachedData != null) return _cachedData!;
     try {
-      final raw = await rootBundle.loadString('assets/data/grafo.json');
+      final raw = await _bundle.loadString('assets/data/grafo.json');
       _cachedData = jsonDecode(raw) as Map<String, dynamic>;
       _validar(_cachedData!);
       return _cachedData!;
@@ -84,6 +90,12 @@ class GrafoRepository {
         throw GrafoInvalidoException(
             'Nodo marcador_ar "${n['id']}" sin aruco_id');
       }
+    }
+
+    final svg = data['mapa_svg'];
+    if (svg is! String || svg.isEmpty) {
+      throw GrafoInvalidoException(
+          'Falta "mapa_svg": cada grafo debe declarar el SVG de su planta');
     }
 
     final tieneEntrada = nodosList.any((n) => n['tipo'] == 'ENTRADA');
@@ -155,14 +167,22 @@ class GrafoRepository {
     return data['piso'] as int? ?? 1;
   }
 
-  /// Ruta del SVG del piso, leída del campo `mapa_svg` del JSON. Si falta,
-  /// usa el SVG de prueba como fallback.
+  /// Ruta del SVG del piso, leída del campo `mapa_svg` del JSON. Es
+  /// obligatorio: [_validar] rechaza el grafo si falta.
   ///
   /// Que viva en el grafo (y no hardcodeada en las pantallas) permite que
   /// cada piso declare su propio SVG sin tocar código. Ver formato en
   /// `docs/grafo-format.md`.
   Future<String> obtenerMapaSvgPath() async {
     final data = await _load();
-    return data['mapa_svg'] as String? ?? 'assets/maps/test_room_5x5.svg';
+    return data['mapa_svg'] as String;
+  }
+
+  /// Ruta del JSON de recintos del piso (campo opcional `recintos_json`).
+  /// Null si el entorno no declara recintos (p. ej. los del pasillo): el
+  /// mapa se dibuja solo con el SVG. Ver `RecintoRepository`.
+  Future<String?> obtenerRecintosPath() async {
+    final data = await _load();
+    return data['recintos_json'] as String?;
   }
 }

@@ -25,7 +25,8 @@ El archivo `assets/data/grafo.json` describe la planta del edificio como un graf
 | `version` | string | Versión del esquema del grafo |
 | `piso` | int | Identificador del piso (1, 2, 3, ...) |
 | `edificio` | string | Código del edificio ("FISC", "TEST") |
-| `mapa_svg` | string | Ruta al SVG que representa visualmente este grafo |
+| `mapa_svg` | string | Ruta al SVG que representa visualmente este grafo (obligatorio: sin él, `GrafoRepository` rechaza el grafo) |
+| `recintos_json` | string (opcional) | Ruta al plano de recintos (polígonos de salones, oficinas, baños y pasillos, en metros). Si está, la app pinta y deja tocar los recintos; si no, solo dibuja el SVG. Ver [ADR-0013](adr/0013-plano-oficial-recintos.md) |
 | `mapa_ancho_metros` | double | Ancho real del piso en metros |
 | `mapa_alto_metros` | double | Alto real del piso en metros |
 

@@ -1,0 +1,13 @@
+{
+  "_descripcion": "Piso 4 con el plano oficial. Sin balizas ubicadas todavía: el punto azul no aparece hasta registrar las balizas reales en este sistema de coordenadas. Calibración = la medida en el pasillo (EXP1).",
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "major": 4,
+  "calibracion": {
+    "txPower_dbm_default": -59,
+    "n_exponente_perdida": 1.6,
+    "ventana_media_movil": 8,
+    "tolerancia_snap_metros": 3.0,
+    "expiracion_lectura_segundos": 3
+  },
+  "beacons": []
+}
