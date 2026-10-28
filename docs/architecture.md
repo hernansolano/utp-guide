@@ -123,8 +123,9 @@ Usuario en SearchScreen ──tap──▶ MapaScreen(destinoId)
 
 Estos archivos no se editan a mano sin revisar antes el impacto:
 
-- `assets/data/grafo.json` — modificarlo vía `tools/grafo_editor.dart`
-- `assets/data/beacon_config.json` — modificable directamente (no hay editor todavía)
+- `assets/data/grafo.json` y `beacon_config.json` — son copias del entorno activo: se editan en
+  `assets/data/entornos/<nombre>/` (con `tools/grafo_editor.dart` para el grafo) y se activan con
+  `tools/entorno.sh`
 - `lib/ui/theme/app_theme.dart` — design tokens, cambios requieren revisión de UX
 - Los tests de `/test/`: no se cambian para que pasen; se arregla el código
 

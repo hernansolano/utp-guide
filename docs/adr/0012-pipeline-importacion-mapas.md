@@ -15,7 +15,7 @@ Se necesita un pipeline que convierta un escaneo en los tres artefactos que cons
 Restricciones del proyecto:
 
 - **Sin dependencias nuevas** sin auditoría ([ADR-0009](0009-pinning-dependencias.md)).
-- `grafo.json` / `beacon_config.json` son **archivos protegidos** (ver [arquitectura](../architecture.md)): el pipeline produce archivos para revisar y pegar, no los sobrescribe a ciegas.
+- `grafo.json` / `beacon_config.json` son **archivos protegidos** (ver [arquitectura](../architecture.md#archivos-protegidos)): el pipeline produce archivos para revisar y pegar, no los sobrescribe a ciegas.
 - El SVG debe quedar **limpio**: muros y puertas, sin etiquetas ni medidas impresas (decisión de producto del equipo).
 
 ## Decisión

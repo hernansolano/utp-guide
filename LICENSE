@@ -1,0 +1,27 @@
+Copyright (c) 2026 Hernán Solano. Todos los derechos reservados.
+
+Este repositorio (código fuente, documentación, mapas, datos e imágenes) se publica
+únicamente para que pueda ser consultado. Su publicación no concede ninguna licencia.
+
+Sin autorización previa y por escrito del titular, no está permitido:
+
+  - copiar, reproducir o redistribuir el contenido, total o parcialmente;
+  - modificarlo o crear obras derivadas;
+  - usarlo, compilarlo o desplegarlo con fines comerciales o no comerciales.
+
+Ver el código en GitHub y crear un fork dentro de la plataforma está permitido solo en la
+medida en que lo exigen los Términos de Servicio de GitHub; ese fork no otorga ninguno de
+los derechos anteriores.
+
+Las dependencias de terceros declaradas en pubspec.yaml conservan sus propias licencias.
+
+Para solicitar permisos: https://github.com/hernansolano
+
+---
+
+Copyright (c) 2026 Hernán Solano. All rights reserved.
+
+This repository is published for viewing purposes only. No license is granted. Copying,
+redistributing, modifying or using any part of it without the prior written permission
+of the copyright holder is prohibited, except for the viewing and forking rights required
+by the GitHub Terms of Service.

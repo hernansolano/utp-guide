@@ -1,0 +1,39 @@
+# Build de iOS SIN firmar, para probar en un iPhone sin tener Mac.
+#
+# Se lanza a mano (pestaña Actions → "iOS IPA sin firmar" → Run workflow) y
+# deja un artifact `utp-guide-ios.ipa`. Ese .ipa se instala desde Windows con
+# Sideloadly, que lo firma con un Apple ID gratuito (la app vence a los 7 días
+# y hay que reinstalarla). Pasos en docs/instalar-en-iphone.md.
+#
+# Ojo con el costo: el repo es privado y los minutos de macOS cuentan x10
+# contra la cuota gratuita (2.000 min ≈ 200 min de macOS al mes). Por eso no
+# corre en cada push.
+name: iOS IPA sin firmar
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.1
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build (sin firma)
+        run: flutter build ios --release --no-codesign
+      - name: Empaquetar .ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry utp-guide-ios.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utp-guide-ios
+          path: utp-guide-ios.ipa
+          retention-days: 14

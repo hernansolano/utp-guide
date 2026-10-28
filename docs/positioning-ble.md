@@ -42,7 +42,9 @@ Es el parámetro más sensible al entorno. Determina qué tan rápido decae la s
 | **Edificios con muros de concreto (FISC)** | **3.0–3.5**  |
 | A través de muros densos (NLOS severo)   | 4.0–5.0      |
 
-UTP-Guide usa **`n = 3.5`** por defecto, calibrado para el edificio FISC. Este valor puede ajustarse en `assets/data/beacon_config.json` sin recompilar.
+UTP-Guide usa **`n = 3.5`** como default de código (valor de literatura para concreto). Este valor puede ajustarse en `assets/data/beacon_config.json` sin recompilar.
+
+**Medición real (EXP1, 2026-06-24):** en el pasillo del piso 4 se midió **`n ≈ 1.6`** (R² = 0.96) con **TxPower ≈ −59 dBm**. Es menor que el de espacio libre porque el pasillo actúa como guía de onda (las reflexiones en muros y piso suman señal). Los entornos del pasillo (`assets/data/entornos/pasillo_exp2*`) ya usan esos valores; dentro de los salones habrá que medir de nuevo.
 
 Ver [ADR-0002](adr/0002-parametros-path-loss.md) para la justificación detallada.
 
@@ -204,4 +206,4 @@ Ver [ADR-0008](adr/0008-simulador-ble-para-testing.md) para el razonamiento comp
 - **Manejo de pisos** usando el campo `major` del iBeacon como identificador de piso
 - **Persistencia local** del historial de RSSI para análisis offline
 
-Las mejoras pendientes se registran como ADRs.
+Ver el [roadmap](roadmap.md).

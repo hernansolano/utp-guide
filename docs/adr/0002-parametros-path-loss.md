@@ -4,6 +4,7 @@
 - **Fecha:** 2026-05-19
 - **Autor:** equipo UTP-Guide
 - **Supersede:** parcialmente — los valores iniciales en código eran `n=2.7, txPower=-59` (hardcoded). Este ADR los reemplaza y los mueve a configuración.
+- **Actualización 2026-06-24:** EXP1 midió en el pasillo del piso 4 `n ≈ 1.6`, `txPower ≈ -59` (guía de onda). Los defaults de código (3.5 / -65) se mantienen como punto de partida para zonas sin medir; los entornos del pasillo usan los valores medidos. Ver `docs/positioning-ble.md`.
 
 ## Contexto
 
