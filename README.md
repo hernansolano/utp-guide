@@ -138,5 +138,6 @@ Panamá, en el marco del programa **SUCCESS** financiado por **Erasmus+** de la 
 
 ## Licencia
 
-© 2026 Hernán Solano. Todos los derechos reservados: el código se publica solo para consulta.
+© 2026 Hernán Solano, Paola Ran y Tiphany Díaz (equipo UTP-Guide). Todos los derechos
+reservados: el código se publica solo para consulta.
 Ver [LICENSE](LICENSE).
