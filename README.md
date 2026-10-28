@@ -3,6 +3,7 @@
 **Navegación interior inclusiva para la Facultad de Ingeniería de Sistemas Computacionales (FISC)
 de la Universidad Tecnológica de Panamá.**
 
+[![CI](https://github.com/hernansolano/utp-guide/actions/workflows/ci.yml/badge.svg)](https://github.com/hernansolano/utp-guide/actions/workflows/ci.yml)
 ![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter)
 ![Dart](https://img.shields.io/badge/Dart-3.11-0175C2?logo=dart)
 ![Plataformas](https://img.shields.io/badge/Plataformas-Android%20%7C%20iOS-lightgrey)
