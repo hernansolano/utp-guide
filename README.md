@@ -130,8 +130,8 @@ Flutter / Dart · `flutter_blue_plus` · `dchs_flutter_beacon` (Core Location) �
 Desarrollado por:
 
 - **Hernán Solano**: desarrollador; arquitectura, posicionamiento BLE y experimentos.
-- **Paola Ran**: desarrolladora; concepto e investigación.
-- **Tiphany Díaz**: desarrolladora; concepto e investigación.
+- **Paola Ran**: desarrolladora; concepto, investigación y pruebas.
+- **Tiphany Díaz**: desarrolladora; concepto, investigación y pruebas.
 
 Estudiantes de la Facultad de Ingeniería de Sistemas Computacionales, Universidad Tecnológica de
 Panamá, en el marco del programa **SUCCESS** financiado por **Erasmus+** de la Unión Europea.
