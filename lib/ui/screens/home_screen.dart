@@ -49,7 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _svgPath = svg;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[HomeScreen] no se pudo cargar el grafo: $e');
       // Si falla la carga del grafo, el header sigue mostrando placeholders
       // — no es bloqueante para que el usuario pueda al menos llegar a
       // SearchScreen y ver el error real ahí.

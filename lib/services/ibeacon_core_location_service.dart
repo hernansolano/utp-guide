@@ -131,18 +131,21 @@ class IbeaconCoreLocationService implements BleSource {
     }
 
     // Paso 3 — verificar BT encendido. En iOS, Core Location ranging
-    // todavía requiere BT activo aunque use otra API.
+    // todavía requiere BT activo aunque use otra API. Si está apagado se
+    // arranca igual el ranging (empieza a entregar beacons solo cuando el
+    // usuario lo encienda), pero el estado debe quedar en
+    // `bluetoothApagado`, no pisarse con `escaneando` al final.
+    var btEncendido = true;
     try {
       final btState = await flutterBeacon.bluetoothState;
       if (kDebugMode) {
         debugPrint('[IbeaconCoreLocation] btState: $btState');
       }
-      if (btState != BluetoothState.stateOn) {
-        _emitir(BleEstado.bluetoothApagado);
-      }
-    } catch (_) {
+      btEncendido = btState == BluetoothState.stateOn;
+    } catch (e) {
       // Si el chequeo falla, intentamos arrancar igual — el ranging
       // dará error si BT no está.
+      debugPrint('[IbeaconCoreLocation] no se pudo leer el estado de BT: $e');
     }
 
     // Paso 4 — arrancar ranging de la región objetivo.
@@ -173,7 +176,7 @@ class IbeaconCoreLocationService implements BleSource {
     });
 
     _activo = true;
-    _emitir(BleEstado.escaneando);
+    _emitir(btEncendido ? BleEstado.escaneando : BleEstado.bluetoothApagado);
   }
 
   @override

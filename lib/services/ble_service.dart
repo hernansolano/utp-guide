@@ -237,7 +237,8 @@ class BleService implements BleSource {
         timeout: const Duration(seconds: 4),
         continuousUpdates: true,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[BleService] startScan falló: $e');
       _emitir(BleEstado.error);
     }
     _restartTimer =

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:path_provider/path_provider.dart';
 import '../models/measurement_session.dart';
 
@@ -40,8 +41,9 @@ class MeasurementRepository {
         final j = jsonDecode(await e.readAsString()) as Map<String, dynamic>;
         final s = MeasurementSession.fromJson(j);
         if (tipo == null || s.tipo == tipo) out.add(s);
-      } catch (_) {
+      } catch (err) {
         // Archivo corrupto o de otra versión — se ignora.
+        debugPrint('[MeasurementRepository] se ignora ${e.path}: $err');
       }
     }
     out.sort((a, b) => b.inicio.compareTo(a.inicio));

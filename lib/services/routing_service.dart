@@ -108,8 +108,20 @@ class RoutingService {
   Future<List<Nodo>> nodosPorTipo(TipoNodo tipo) =>
       _repo.obtenerNodosPorTipo(tipo);
 
+  /// Tipos de nodo que representan circulación (pasillos y accesos). Los
+  /// destinos (salones, baños, oficinas, ascensores...) quedan fuera porque
+  /// su nodo puede estar del otro lado de una pared: el usuario en el
+  /// pasillo quedaría "dentro" del salón vecino y la ruta saldría mal.
+  static const _tiposCirculacion = {TipoNodo.interseccion, TipoNodo.entrada};
+
+  /// Nodo de circulación más cercano a (x, y), en metros. Se usa como
+  /// origen al re-rutear desde la posición BLE. Si el grafo no tiene nodos
+  /// de circulación, cae a todos los nodos.
   Future<Nodo> nodoMasCercano(double x, double y) async {
-    final nodos = await _repo.obtenerNodos();
+    final todos = await _repo.obtenerNodos();
+    final circulacion =
+        todos.where((n) => _tiposCirculacion.contains(n.tipo)).toList();
+    final nodos = circulacion.isNotEmpty ? circulacion : todos;
     return nodos.reduce((a, b) {
       final da = sqrt(pow(a.x - x, 2) + pow(a.y - y, 2));
       final db = sqrt(pow(b.x - x, 2) + pow(b.y - y, 2));

@@ -51,6 +51,10 @@ class _Exp2ScreenState extends State<Exp2Screen> {
   Size? _dims;
   String? _svg;
   int _piso = 1;
+
+  /// `major` del entorno: las lecturas de balizas de otro piso (o del aula,
+  /// major 99) con el mismo minor no deben entrar a los algoritmos.
+  int? _major;
   List<PositioningAlgorithm> _algos = [];
 
   Position? _real;
@@ -83,6 +87,7 @@ class _Exp2ScreenState extends State<Exp2Screen> {
     final piso = await widget.grafoRepository.obtenerPiso();
     final cal = await widget.beaconRepository.obtenerCalibracion();
     final beacons = await widget.beaconRepository.obtenerTodosLosBeacons();
+    final major = await widget.beaconRepository.obtenerMajor();
     final mapa = <int, BeaconPos>{
       for (final b in beacons) b.minor: BeaconPos(b.x, b.y, b.txPowerDbm),
     };
@@ -91,6 +96,7 @@ class _Exp2ScreenState extends State<Exp2Screen> {
       _dims = Size(dims.anchoMetros, dims.altoMetros);
       _svg = svg;
       _piso = piso;
+      _major = major;
       _algos = _construirAlgos(mapa, cal, piso);
     });
   }
@@ -132,6 +138,7 @@ class _Exp2ScreenState extends State<Exp2Screen> {
   void _onReading(BeaconReading r) {
     final real = _real;
     if (real == null) return;
+    if (_major != null && r.major != _major) return;
     final estimaciones = <String, dynamic>{};
     for (final a in _algos) {
       final pos = a.procesar(r);

@@ -83,6 +83,9 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
   String? _uuid;
   int? _major;
 
+  /// Piso del grafo activo (para la posición real marcada en el mini-mapa).
+  int _piso = 1;
+
   /// Valor de calibración como vino del archivo, para poder restaurarlo.
   late CalibracionPositioning _calibracionOriginal;
 
@@ -184,6 +187,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
     // Cargar mapa para la sección de validación end-to-end.
     final dims = await widget.grafoRepository.obtenerDimensionesMapa();
     final svg = await widget.grafoRepository.obtenerMapaSvgPath();
+    final piso = await widget.grafoRepository.obtenerPiso();
     if (mounted) {
       setState(() {
         _beaconsConfig = beacons;
@@ -191,6 +195,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
         _major = major;
         _dimensionesMapa = Size(dims.anchoMetros, dims.altoMetros);
         _svgPath = svg;
+        _piso = piso;
       });
     }
   }
@@ -217,7 +222,7 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
       _posicionReal = Position(
         x: metros.dx,
         y: metros.dy,
-        piso: 1,
+        piso: _piso,
         timestamp: DateTime.now(),
       );
       _errorStats.reset();
@@ -1140,9 +1145,11 @@ class _CalibracionScreenState extends State<CalibracionScreen> {
           _SliderCalibracion(
             label: 'n (exponente de pérdida)',
             valor: cal.nExponentePerdida,
-            min: 2.0,
+            // Desde 1.2: en el pasillo del piso 4 se midió n≈1.6 (EXP1,
+            // efecto guía de onda), fuera del rango típico de interiores.
+            min: 1.2,
             max: 5.0,
-            divisions: 60,
+            divisions: 76,
             format: (v) => v.toStringAsFixed(2),
             valorOriginal: _calibracionOriginal.nExponentePerdida,
             onChanged: (v) {

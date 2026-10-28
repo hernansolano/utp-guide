@@ -32,12 +32,14 @@ Antes de instalar, configurar cada baliza con la app oficial de Minew (Minew Bea
 | Campo | Valor |
 |-------|-------|
 | **UUID** | `550e8400-e29b-41d4-a716-446655440000` |
-| **Major** | Número del piso (1, 2, 3, ...) |
+| **Major** | Número del piso: **4** para el piloto (debe coincidir con `major` de `beacon_config.json`) |
 | **Minor** | ID único de la baliza dentro del piso (1, 2, 3, ...) |
 | **TX Power** | **-12 dBm** (potencia reducida interior) |
 | **Intervalo de anuncio** | 500 ms |
 
 > **Importante:** todas las balizas del proyecto comparten el mismo UUID. El UUID identifica al sistema UTP-Guide; Major identifica el piso; Minor identifica la baliza individual.
+>
+> **La app descarta las lecturas cuyo Major no coincide** con el `major` de `beacon_config.json`, y también los Minor que no estén registrados ahí (desde el 2026-10-28). Si una baliza no aparece en el mapa pero sí en el diagnóstico de Calibración, revisa primero su Major.
 
 ## 3. Instalación física
 

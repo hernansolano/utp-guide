@@ -70,6 +70,16 @@ class PositioningService {
   // Dimensiones del mapa cargadas del grafo (default = cuarto de prueba 5x5).
   DimensionesMapa _dimensiones = const DimensionesMapa(5.0, 5.0);
 
+  /// Piso del grafo activo (campo `piso` de `grafo.json`). Se estampa en
+  /// cada [Position] emitida.
+  int _piso = 1;
+
+  /// `major` del entorno activo (campo `major` de `beacon_config.json`).
+  /// Las lecturas con otro `major` (otro piso, el aula de pruebas con
+  /// major 99) se descartan: si no, una baliza ajena con el mismo `minor`
+  /// sesgaría la posición. `null` = sin filtro (config sin `major`).
+  int? _major;
+
   /// Configuración de las balizas cargada al iniciar.
   /// **Cache crítico para performance:** evita un await por cada lectura
   /// BLE. Las balizas no cambian durante runtime (la calibración sí, pero
@@ -199,6 +209,7 @@ class PositioningService {
     if (_refCount > 1) return; // ya inicializado por otro consumidor
 
     _dimensiones = await _grafoRepo.obtenerDimensionesMapa();
+    _piso = await _grafoRepo.obtenerPiso();
     await _precargarBeacons();
     await _precargarGrafo();
     _bleSub = _ble.beaconStream.listen(_procesarLectura);
@@ -209,6 +220,13 @@ class PositioningService {
   /// de la calibración si la baliza no tiene su propio override).
   Future<void> _precargarBeacons() async {
     _configsBeacon.clear();
+    try {
+      _major = await _beaconRepo.obtenerMajor();
+    } catch (e) {
+      debugPrint('[Positioning] beacon_config.json sin "major" válido, '
+          'no se filtra por major: $e');
+      _major = null;
+    }
     final minors = await _beaconRepo.obtenerMinorsRegistrados();
     for (final m in minors) {
       try {
@@ -219,8 +237,8 @@ class PositioningService {
           y: c.y,
           txPowerDbm: c.txPowerDbm,
         );
-      } catch (_) {
-        // baliza inválida — saltar
+      } catch (e) {
+        debugPrint('[Positioning] baliza minor=$m inválida, se omite: $e');
       }
     }
   }
@@ -283,6 +301,12 @@ class PositioningService {
     // fuente iOS ya filtra, esto cubre cualquier otra fuente futura.
     if (lectura.rssi >= -20.0) return;
 
+    // Solo balizas del entorno activo: mismo major (piso) y minor
+    // registrado. Una baliza desconocida no aporta a la trilateración y
+    // solo inflaría el contador de balizas activas.
+    if (_major != null && lectura.major != _major) return;
+    if (!_configsBeacon.containsKey(lectura.minor)) return;
+
     // 1. Modelo de path-loss → distancia
     final txPower = _txPowerSync(lectura.minor);
     final distancia = pow(10.0,
@@ -337,14 +361,14 @@ class PositioningService {
     final y = (sumY / sumW).clamp(0.0, _dimensiones.altoMetros);
 
     _debugPosicionCruda =
-        Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
+        Position(x: x, y: y, piso: _piso, timestamp: DateTime.now());
 
     final snapOn = _snapHabilitadoListenable?.value ?? true;
     if (!snapOn) {
       // Modo crudo (debug): sin snap ni suavizado, para ver el salto real
       // del centroide tal cual cae.
       _posSuavizada = null;
-      return Position(x: x, y: y, piso: 1, timestamp: DateTime.now());
+      return Position(x: x, y: y, piso: _piso, timestamp: DateTime.now());
     }
     return _suavizar(_snapToGraphSync(x, y));
   }
@@ -372,7 +396,7 @@ class PositioningService {
     final dentro = minDist <= _calibracion.toleranciaSnapMetros;
     final finalX = dentro ? x + _factorSnap * (snapX - x) : x;
     final finalY = dentro ? y + _factorSnap * (snapY - y) : y;
-    return Position(x: finalX, y: finalY, piso: 1, timestamp: DateTime.now());
+    return Position(x: finalX, y: finalY, piso: _piso, timestamp: DateTime.now());
   }
 
   /// Suaviza el movimiento del dot con un EMA: filtra saltos bruscos (una
@@ -384,7 +408,7 @@ class PositioningService {
         : Position(
             x: prev.x + _alphaSuavizado * (nueva.x - prev.x),
             y: prev.y + _alphaSuavizado * (nueva.y - prev.y),
-            piso: 1,
+            piso: _piso,
             timestamp: DateTime.now(),
           );
     _posSuavizada = s;

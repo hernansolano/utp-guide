@@ -34,6 +34,12 @@ import '../exceptions.dart';
 /// definidos en [CalibracionPositioning.defaults]. Ver
 /// `docs/adr/0002-parametros-path-loss.md`.
 class BeaconRepository {
+  /// De dónde se lee `beacon_config.json`. En la app es [rootBundle]; los
+  /// tests inyectan un bundle con una config de prueba.
+  final AssetBundle _bundle;
+
+  BeaconRepository({AssetBundle? bundle}) : _bundle = bundle ?? rootBundle;
+
   Map<String, dynamic>? _cachedData;
   List<ConfigBeacon>? _cachedBeacons;
   CalibracionPositioning? _cachedCalibracion;
@@ -41,8 +47,7 @@ class BeaconRepository {
   Future<Map<String, dynamic>> _load() async {
     if (_cachedData != null) return _cachedData!;
     try {
-      final raw =
-          await rootBundle.loadString('assets/data/beacon_config.json');
+      final raw = await _bundle.loadString('assets/data/beacon_config.json');
       _cachedData = jsonDecode(raw) as Map<String, dynamic>;
       return _cachedData!;
     } catch (e) {

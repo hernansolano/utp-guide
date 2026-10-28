@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_tts/flutter_tts.dart';
 
 /// Wrapper sobre `flutter_tts` configurado para español.
@@ -64,10 +65,11 @@ class TtsService {
       _inicializado = true;
       _disponible = true;
       return true;
-    } catch (_) {
+    } catch (e) {
       // Casos típicos: dispositivo sin motor TTS, idioma no soportado,
-      // emulador sin Google Play Services. Falla silenciosa — la voz es
-      // accesorio, la navegación funciona sin ella.
+      // emulador sin Google Play Services. La voz es accesorio: la
+      // navegación funciona sin ella.
+      debugPrint('[TtsService] TTS no disponible: $e');
       _inicializado = true;
       _disponible = false;
       return false;
@@ -84,9 +86,10 @@ class TtsService {
     try {
       await _tts.stop();
       await _tts.speak(texto);
-    } catch (_) {
+    } catch (e) {
       // Algo cambió en runtime (idioma desinstalado, audio focus perdido).
       // Marcamos como no disponible y dejamos pasar.
+      debugPrint('[TtsService] falló speak(): $e');
       _disponible = false;
     }
   }
@@ -97,8 +100,8 @@ class TtsService {
     if (_disponible == false) return;
     try {
       await _tts.stop();
-    } catch (_) {
-      // ignore
+    } catch (e) {
+      debugPrint('[TtsService] falló stop(): $e');
     }
   }
 
